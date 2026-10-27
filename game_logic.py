@@ -1,0 +1,100 @@
+STARTING_LIVES = 3
+WINNING_LIVES = 6
+
+def check_guess(guess, secret, range_lowest, range_highest, guessed_list):
+    try:
+        number = int(guess)
+    except ValueError:
+        return "invalid"
+
+    if number < range_lowest or number > range_highest:
+        return "out of range"
+
+    if number in guessed_list:
+        return "repeat"
+    guessed_list.append(number)
+
+    if number > secret:
+        return "too high"
+    elif number < secret:
+        return "too low"
+    else:
+        return "correct"
+
+def lives_after_round(lives, won_round, difficulty):
+    if won_round == True:
+        return lives + 1
+    elif difficulty == "hard" and lives > STARTING_LIVES:
+        return STARTING_LIVES
+    else:
+        return lives - 1
+
+def heart_counts(lives):
+    normal_hearts = min(lives, STARTING_LIVES)
+    golden_hearts = max(lives - STARTING_LIVES, 0)
+    return normal_hearts, golden_hearts
+
+def game_result(lives, tokens, tokens_needed):
+    if lives == 0:
+        return "game_lost"
+    elif tokens == tokens_needed:
+        return "game_won"
+    else:
+        return "playing"
+
+def has_progress(lives, tokens, tokens_needed, rounds_played, try_count):
+    if game_result(lives, tokens, tokens_needed) != "playing":
+        return False
+    return rounds_played > 0 or try_count > 0
+
+def difficulty_settings(difficulty):
+    # lowest, highest, max tries, tokens needed to win
+    if difficulty == "easy":
+        return 1, 50, 10, 3
+    elif difficulty == "hard":
+        return 1, 100, 7, 7
+    else:
+        return 1, 100, 10, 5
+
+def max_digits(range_lowest, range_highest):
+    return max(len(str(range_lowest)), len(str(range_highest)))
+
+def after_round(lives, tokens, won_round, difficulty):
+    if won_round == True:
+        if lives < STARTING_LIVES:
+            lives += 1          # recovering: win back a life
+        else:
+            tokens += 1         # full health: earn a token
+    else:
+        if tokens > 0:
+            if difficulty == "hard":
+                tokens = 0      # hard mode: lose them all
+            else:
+                tokens -= 1
+        else:
+            lives -= 1
+    return lives, tokens
+
+def narrowed_range(guessed_list, secret, range_lowest, range_highest):
+    low = range_lowest
+    high = range_highest
+    for guess in guessed_list:
+        if guess < secret:
+            low = max(low, guess + 1)       # too low: the answer is above it
+        elif guess > secret:
+            high = min(high, guess - 1)     # too high: the answer is below it
+    return low, high
+
+def closest_guesses(guessed_list, secret):
+    # The highest guess below the secret and the lowest guess above it
+    # (None if there's no guess on that side yet)
+    below = None
+    above = None
+    for guess in guessed_list:
+        if guess < secret:
+            if below is None or guess > below:
+                below = guess
+        elif guess > secret:
+            if above is None or guess < above:
+                above = guess
+    return below, above
