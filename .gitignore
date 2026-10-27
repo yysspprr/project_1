@@ -6,3 +6,4 @@ __pycache__/
 CLI app/
 ideas.md
 mockup.png
+gui.py
