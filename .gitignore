@@ -1,5 +1,6 @@
 .BACKUP/
 __pycache__/
+assets/
 *.pyc
 .venv/
 .DS_Store
