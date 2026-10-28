@@ -515,6 +515,7 @@ def apply_theme(new_theme, new_mode):
     global heading_letters, heading_poses, cursor_on, cursor_off, cursor_poses
     global continue_letters, continue_poses, play_again_letters, play_again_poses
     global token_frames_filled, token_frames_empty, enter_frames, space_frames, enter_image, space_image
+    global enter_poses, space_poses
 
     theme = new_theme
     mode = new_mode
@@ -543,6 +544,8 @@ def apply_theme(new_theme, new_mode):
     space_frames = tint_frames(space_frames_white, MUTED_COLOR)
     enter_image = random.choice(enter_frames)
     space_image = random.choice(space_frames)
+    enter_poses = make_poses([enter_image], "subtle")
+    space_poses = make_poses([space_image], "subtle")
 
     # Cursor and small labels
     cursor_on = typed_font.render(CURSOR_SYMBOL, True, MUTED_COLOR)
@@ -642,9 +645,6 @@ range_label_font = pygame.font.Font(DIGIT_FONT_PATH, RANGE_LABEL_FONT_SIZE)
 # 3.2 - Menu screen setup                               #
 # =======================================================
 
-title_letters = make_letters("guesstimate!", title_font, TEXT_COLOR)
-title_poses = make_poses(title_letters)
-
 new_game_button = make_button("new game")
 free_mode_button = make_button("free mode")
 exit_button = make_button("exit")
@@ -652,9 +652,6 @@ exit_button = make_button("exit")
 # =======================================================
 # 3.3 - Difficulty screen setup                         #
 # =======================================================
-
-difficulty_title_letters = make_letters("pick a difficulty", menu_font, TEXT_COLOR)
-difficulty_title_poses = make_poses(difficulty_title_letters, "normal")
 
 easy_button = make_button("easy")
 normal_button = make_button("normal")
@@ -670,64 +667,19 @@ game = GameState()
 # 3.5 - Game screen setup                               #
 # =======================================================
 
-heading_letters = make_letters("guess a number", small_heading_font, TEXT_COLOR)
-heading_poses = make_poses(heading_letters, "normal")
-
-# Filled in by start_game
-range_letters = []
-range_poses = []
-difficulty_label_letters = []
-difficulty_label_poses = []
-
 heart_frames_red = load_heart_frames("red")
 heart_frames_gold = load_heart_frames("gold")
 heart_frames_empty = load_heart_frames("empty")
 
 token_frames_filled_white = load_frames(TOKENS_FILLED_DIR, "token_filled", TOKEN_SIZE)
-token_frames_filled = []
-for frame in token_frames_filled_white:
-    token_frames_filled.append(tint_image(frame, ACCENT_COLOR))
-
 token_frames_empty_white = load_frames(TOKENS_EMPTY_DIR, "token_empty", TOKEN_SIZE)
-token_frames_empty = []
-for frame in token_frames_empty_white:
-    token_frames_empty.append(tint_image(frame, MUTED_COLOR))
+enter_frames_white = load_frames(ENTER_KEY_DIR, "enter_key", ENTER_KEY_SIZE)
+space_frames_white = load_frames(SPACE_BAR_KEY_DIR, "space_key", SPACE_BAR_KEY_SIZE)
 
 # Width of the widest character you can type, so the box always fits
 typed_char_width = 0
 for char in "0123456789-_":
     typed_char_width = max(typed_char_width, typed_font.size(char)[0])
-
-make_entry_box(game.max_digits)
-make_history_box(game.max_tries, game.max_digits)
-make_range_track()
-make_range_fill()
-
-cursor_on = typed_font.render(CURSOR_SYMBOL, True, MUTED_COLOR)
-cursor_off = pygame.Surface(cursor_on.get_size(), pygame.SRCALPHA)
-cursor_poses = make_poses([cursor_on], "typed")
-
-enter_frames_white = load_frames(ENTER_KEY_DIR, "enter_key", ENTER_KEY_SIZE)
-enter_frames = []
-for frame in enter_frames_white:
-    enter_frames.append(tint_image(frame, TEXT_COLOR))
-
-space_frames_white = load_frames(SPACE_BAR_KEY_DIR, "space_key", SPACE_BAR_KEY_SIZE)
-space_frames = []
-for frame in space_frames_white:
-    space_frames.append(tint_image(frame, MUTED_COLOR))
-
-space_image = random.choice(space_frames)
-space_poses = make_poses([space_image], "subtle")
-
-continue_letters = make_letters("next round", tiny_font, MUTED_COLOR)
-continue_poses = make_poses(continue_letters, "subtle")
-
-play_again_letters = make_letters("play again", tiny_font, MUTED_COLOR)
-play_again_poses = make_poses(play_again_letters, "subtle")
-
-enter_image = random.choice(enter_frames)
-enter_poses = make_poses([enter_image], "subtle")
 
 # =======================================================
 # 3.6 - Bottom bar setup                                #
@@ -741,14 +693,12 @@ settings_icon = make_icon_button("settings")
 all_icons = [home_icon, back_icon, restart_icon, settings_icon]
 
 bar_surface = pygame.Surface((WIDTH, BAR_HEIGHT), pygame.SRCALPHA)
-bar_surface.fill(BAR_COLOR)
 
 # =======================================================
 # 3.7 - Warning modal setup                             #
 # =======================================================
 
 warning_modal_overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-warning_modal_overlay.fill(OVERLAY_COLOR)
 
 warning_modal_panel = pygame.Rect((0, 0), WARNING_MODAL_SIZE)
 warning_modal_panel.center = (CENTER_X, HEIGHT // 2)
@@ -896,6 +846,13 @@ while running:
                 next_round()
             else:
                 start_game(game.difficulty)
+
+        # L switches between light and dark mode
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_l and game.warning_modal_open == False:
+            if mode == "dark":
+                apply_theme(theme, "light")
+            else:
+                apply_theme(theme, "dark")
 
     # ===================================================
     # 4.3 - Update                                      #
