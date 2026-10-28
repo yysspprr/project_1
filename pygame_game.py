@@ -25,7 +25,7 @@ from backgrounds import make_background
 # 1.2 - Colors                                          #
 # =======================================================
 
-theme = "rain"
+theme = "plain"
 mode = "dark"           # "dark" or "light"
 
 def set_palette(theme, mode):
@@ -861,6 +861,12 @@ while running:
             else:
                 apply_theme(theme, "dark")
 
+        # T goes to the next theme
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_t and game.warning_modal_open == False:
+            theme_names = list(THEMES)
+            next_index = (theme_names.index(theme) + 1) % len(theme_names)
+            apply_theme(theme_names[next_index], mode)
+
     # ===================================================
     # 4.3 - Update                                      #
     # ===================================================
@@ -933,6 +939,10 @@ while running:
 
         # Warning modal
         warning_modal_poses = make_poses(warning_modal_letters, "normal")
+
+        # Background
+        if background is not None:
+            background.wobble()
 
         last_wobble = now
 

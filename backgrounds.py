@@ -1,5 +1,7 @@
 # Animated backgrounds: each one is a class with update() and draw()
 
+import math
+
 import random
 
 import pygame
@@ -16,6 +18,8 @@ class RainBackground:
     FLATTEN = 0.35                  # rings are squashed: we see the water from an angle
     LINE_WIDTH = 2
     ECHO_DELAY = 0.25               # how far behind the second ring follows
+    POINTS = 24                     # points around each ring
+    JITTER = 0.05                   # how far a point can wobble, as a share of the ring's size
 
     def __init__(self):
         self.ripples = []
@@ -43,7 +47,21 @@ class RainBackground:
             "radius": s(random.randint(*self.RADIUS)),
             "lifetime": random.randint(*self.LIFETIME),
             "age": 0,
+            "age": 0,
+            "jitter": self.make_jitter(),
         })
+
+    def make_jitter(self):
+        # A small random push in or out for each point of the ring
+        jitter = []
+        for i in range(self.POINTS):
+            jitter.append(random.uniform(-self.JITTER, self.JITTER))
+        return jitter
+
+    def wobble(self):
+        # Called on every wobble tick: new pushes, so the rings boil
+        for ripple in self.ripples:
+            ripple["jitter"] = self.make_jitter()
 
     def draw(self, surface, palette):
         surface.fill(palette["bg"])
@@ -61,16 +79,25 @@ class RainBackground:
     def draw_ring(self, surface, ripple, progress, strength, bg, ripple_color):
         # Fast at first, slowing down, like a real ripple
         grown = 1 - (1 - progress) ** 2
-        width = round(ripple["radius"] * 2 * grown)
-        height = round(width * self.FLATTEN)
+        radius_x = ripple["radius"] * grown
+        radius_y = radius_x * self.FLATTEN
         line = s(self.LINE_WIDTH)
-        if height < line * 2:
+        if radius_y < line:
             return                  # too small to draw as a ring yet
 
-        ring = pygame.Rect(0, 0, width, height)
-        ring.center = (ripple["x"], ripple["y"])
         fade = (1 - progress) * strength
-        pygame.draw.ellipse(surface, bg.lerp(ripple_color, fade), ring, line)
+        color = bg.lerp(ripple_color, fade)
+
+        points = []
+        for i in range(self.POINTS):
+            angle = 2 * math.pi * i / self.POINTS
+            push = 1 + ripple["jitter"][i]
+            points.append((ripple["x"] + radius_x * math.cos(angle) * push,
+                           ripple["y"] + radius_y * math.sin(angle) * push))
+
+        pygame.draw.lines(surface, color, True, points, line)
+        for point in points:
+            pygame.draw.circle(surface, color, point, line / 2)
 
 
 # Which background goes with which theme (themes without one use a plain color)
