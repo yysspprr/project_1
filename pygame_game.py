@@ -19,16 +19,17 @@ import pygame
 import game_logic as logic
 from config import *
 from themes import THEMES
+from backgrounds import make_background
 
 # =======================================================
 # 1.2 - Colors                                          #
 # =======================================================
 
-theme = "plain"
+theme = "rain"
 mode = "dark"           # "dark" or "light"
 
 def set_palette(theme, mode):
-    global BG_COLOR, TEXT_COLOR, ACCENT_COLOR, FIELD_COLOR, MUTED_COLOR
+    global palette, BG_COLOR, TEXT_COLOR, ACCENT_COLOR, FIELD_COLOR, MUTED_COLOR
     global OVERLAY_COLOR, HISTORY_BOX_COLOR, RANGE_FILL_COLOR, BAR_COLOR
 
     palette = THEMES[theme][mode]
@@ -510,12 +511,16 @@ def clicked_bar_icon(pos):
 
 def apply_theme(new_theme, new_mode):
     # Switch to a theme and remake everything that has a color
-    global theme, mode
+    global theme, mode, background
     global title_letters, title_poses, difficulty_title_letters, difficulty_title_poses
     global heading_letters, heading_poses, cursor_on, cursor_off, cursor_poses
     global continue_letters, continue_poses, play_again_letters, play_again_poses
     global token_frames_filled, token_frames_empty, enter_frames, space_frames, enter_image, space_image
     global enter_poses, space_poses
+
+    # A new background only when the theme changes, so a mode switch keeps the ripples
+    if background is None or new_theme != theme:
+        background = make_background(new_theme)
 
     theme = new_theme
     mode = new_mode
@@ -723,6 +728,7 @@ all_buttons = [
 # 3.8 - Starting values                                 #
 # =======================================================
 
+background = None
 apply_theme(theme, mode)
 
 ### =====================================================
@@ -736,6 +742,7 @@ apply_theme(theme, mode)
 # =======================================================
 
 last_wobble = 0
+dt = 0
 running = True
 
 while running:
@@ -859,6 +866,10 @@ while running:
     # ===================================================
 
     now = pygame.time.get_ticks()
+
+    if background is not None and game.warning_modal_open == False:
+        background.update(dt)
+
     if now - last_wobble >= WOBBLE_INTERVAL and game.warning_modal_open == False:
 
         # Buttons
@@ -929,7 +940,10 @@ while running:
     # 4.4 - Draw                                        #
     # ===================================================
 
-    screen.fill(BG_COLOR)
+    if background is None:
+        screen.fill(BG_COLOR)
+    else:
+        background.draw(screen, palette)
 
     if game.screen == "menu":
         draw_wobbly(title_letters, title_poses, CENTER_X, TITLE_Y)
@@ -1022,6 +1036,6 @@ while running:
         draw_button(warning_modal_no_button, warning_modal_panel.top + WARNING_NO_OFFSET, in_modal=True)
 
     pygame.display.flip()
-    clock.tick(FPS)
+    dt = clock.tick(FPS)            # milliseconds since the last frame
 
 pygame.quit()

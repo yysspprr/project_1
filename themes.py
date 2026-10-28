@@ -26,4 +26,31 @@ THEMES = {
             "bar": (0, 0, 0, 25),
         },
     },
+
+    "rain": {
+        "dark": {
+            "bg": "#1a2230",
+            "text": "#d6e2f0",
+            "accent": "#f2d58a",
+            "field": "#26324a",
+            "muted": "#7d8ba0",
+            "overlay": (0, 0, 0, 160),
+            "history_box": (0, 0, 0, 60),
+            "range_fill": "#f2d58a",
+            "bar": (0, 0, 0, 50),
+            "ripple": "#4a5d7a",        # the brightest a fresh ripple gets
+        },
+        "light": {
+            "bg": "#e4ecf3",
+            "text": "#34445a",
+            "accent": "#c98a1c",
+            "field": "#cdd8e4",
+            "muted": "#8796aa",
+            "overlay": (0, 0, 0, 100),
+            "history_box": (0, 0, 0, 25),
+            "range_fill": "#c98a1c",
+            "bar": (0, 0, 0, 25),
+            "ripple": "#a3b7cc",
+        },
+    },
 }
