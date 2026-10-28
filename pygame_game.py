@@ -234,6 +234,12 @@ def tint_image(image, color):
     tinted.fill(color, special_flags=pygame.BLEND_RGBA_MULT)
     return tinted
 
+def tint_frames(frames, color):
+    tinted = []
+    for frame in frames:
+        tinted.append(tint_image(frame, color))
+    return tinted
+
 def load_heart_frames(state):
     frames = []
     for number in range(1, 4):
@@ -502,6 +508,69 @@ def clicked_bar_icon(pos):
             return icon
     return None
 
+def apply_theme(new_theme, new_mode):
+    # Switch to a theme and remake everything that has a color
+    global theme, mode
+    global title_letters, title_poses, difficulty_title_letters, difficulty_title_poses
+    global heading_letters, heading_poses, cursor_on, cursor_off, cursor_poses
+    global continue_letters, continue_poses, play_again_letters, play_again_poses
+    global token_frames_filled, token_frames_empty, enter_frames, space_frames, enter_image, space_image
+
+    theme = new_theme
+    mode = new_mode
+    set_palette(theme, mode)
+
+    # Titles and headings
+    title_letters = make_letters("guesstimate!", title_font, TEXT_COLOR)
+    title_poses = make_poses(title_letters)
+    difficulty_title_letters = make_letters("pick a difficulty", menu_font, TEXT_COLOR)
+    difficulty_title_poses = make_poses(difficulty_title_letters, "normal")
+    heading_letters = make_letters("guess a number", small_heading_font, TEXT_COLOR)
+    heading_poses = make_poses(heading_letters, "normal")
+
+    # Buttons and bar icons
+    for button in all_buttons:
+        button["letters"] = make_letters(button["text"], menu_font, TEXT_COLOR)
+        button["hover_letters"] = make_letters(button["text"], menu_font, ACCENT_COLOR)
+    for icon in all_icons:
+        icon["frames"] = tint_frames(icon["white_frames"], TEXT_COLOR)
+        icon["hover_frames"] = tint_frames(icon["white_frames"], ACCENT_COLOR)
+
+    # Tinted images
+    token_frames_filled = tint_frames(token_frames_filled_white, ACCENT_COLOR)
+    token_frames_empty = tint_frames(token_frames_empty_white, MUTED_COLOR)
+    enter_frames = tint_frames(enter_frames_white, TEXT_COLOR)
+    space_frames = tint_frames(space_frames_white, MUTED_COLOR)
+    enter_image = random.choice(enter_frames)
+    space_image = random.choice(space_frames)
+
+    # Cursor and small labels
+    cursor_on = typed_font.render(CURSOR_SYMBOL, True, MUTED_COLOR)
+    cursor_off = pygame.Surface(cursor_on.get_size(), pygame.SRCALPHA)
+    cursor_poses = make_poses([cursor_on], "typed")
+    continue_letters = make_letters("next round", tiny_font, MUTED_COLOR)
+    continue_poses = make_poses(continue_letters, "subtle")
+    play_again_letters = make_letters("play again", tiny_font, MUTED_COLOR)
+    play_again_poses = make_poses(play_again_letters, "subtle")
+
+    # See-through layers
+    bar_surface.fill(BAR_COLOR)
+    warning_modal_overlay.fill(OVERLAY_COLOR)
+
+    # Game screen: boxes and setters, rebuilt from the current game
+    make_entry_box(game.max_digits)
+    make_history_box(game.max_tries, game.max_digits)
+    make_range_track()
+    make_range_fill()
+    set_game_labels()
+    set_game_message(game.message)
+    set_typed(game.typed_guess)
+    set_tries_label()
+    set_round_label()
+    set_hearts()
+    set_tokens()
+    set_history()
+
 # =======================================================
 # 2.3 - Game state class                                #
 # =======================================================
@@ -694,17 +763,17 @@ warning_modal_poses = []
 warning_modal_yes_button = make_button("yes")
 warning_modal_no_button = make_button("no")
 
+all_buttons = [
+    new_game_button, free_mode_button, exit_button,
+    easy_button, normal_button, hard_button,
+    warning_modal_yes_button, warning_modal_no_button,
+]
+
 # =======================================================
 # 3.8 - Starting values                                 #
 # =======================================================
 
-set_game_message("")
-set_tries_label()
-set_hearts()
-set_typed("")
-set_round_label()
-set_tokens()
-set_history()
+apply_theme(theme, mode)
 
 ### =====================================================
 ### 4 - MAIN LOOP                                       #
@@ -718,12 +787,6 @@ set_history()
 
 last_wobble = 0
 running = True
-
-all_buttons = [
-    new_game_button, free_mode_button, exit_button,
-    easy_button, normal_button, hard_button,
-    warning_modal_yes_button, warning_modal_no_button,
-]
 
 while running:
 
