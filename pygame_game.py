@@ -132,6 +132,7 @@ def draw_stacked(images, poses, center_x, y, gap, row_gap):
 def make_button(text):
     letters = make_letters(text, menu_font, TEXT_COLOR)
     return {
+        "text": text,
         "letters": letters,
         "hover_letters": make_letters(text, menu_font, ACCENT_COLOR),
         "poses": make_poses(letters),
@@ -158,6 +159,7 @@ def make_icon_button(name):
         normal_frames.append(tint_image(frame, TEXT_COLOR))
         hover_frames.append(tint_image(frame, ACCENT_COLOR))
     return {
+        "white_frames": frames,
         "frames": normal_frames,
         "hover_frames": hover_frames,
         "frame": 0,                             # which of the three frames is showing
@@ -253,23 +255,15 @@ def load_frames(folder, name, size):
 # =======================================================
 
 def start_game(difficulty):
-    global difficulty_label_letters, difficulty_label_poses, range_letters, range_poses
-
     game.difficulty = difficulty
     game.screen = "game"
 
-    difficulty_label_letters = make_letters(f"{difficulty} mode", tiny_font, MUTED_COLOR)
-    difficulty_label_poses = make_poses(difficulty_label_letters, "subtle")
-
     game.range_lowest, game.range_highest, game.max_tries, game.tokens_needed = logic.difficulty_settings(difficulty)
     game.max_digits = logic.max_digits(game.range_lowest, game.range_highest)
+    set_game_labels()
 
     make_entry_box(game.max_digits)
     make_history_box(game.max_tries, game.max_digits)
-
-    range_letters = make_letters(f"({game.range_lowest}-{game.range_highest})", small_heading_font, TEXT_COLOR,
-                                 small_heading_digit_font)
-    range_poses = make_poses(range_letters, "normal")
 
     game.lives = logic.STARTING_LIVES
     game.tokens = 0
@@ -277,6 +271,16 @@ def start_game(difficulty):
     set_hearts()
     set_tokens()
     next_round()
+
+def set_game_labels():
+    global difficulty_label_letters, difficulty_label_poses, range_letters, range_poses
+
+    difficulty_label_letters = make_letters(f"{game.difficulty} mode", tiny_font, MUTED_COLOR)
+    difficulty_label_poses = make_poses(difficulty_label_letters, "subtle")
+
+    range_letters = make_letters(f"({game.range_lowest}-{game.range_highest})", small_heading_font, TEXT_COLOR,
+                                 small_heading_digit_font)
+    range_poses = make_poses(range_letters, "normal")
 
 def next_round():
     game.secret = random.randint(game.range_lowest, game.range_highest)
@@ -309,6 +313,7 @@ def end_round(won_round):
     print(f"lives: {game.lives}, tokens: {game.tokens}/{game.tokens_needed}")
 
 def set_game_message(text):
+    game.message = text
     global message_letters, message_poses
     message_letters = make_letters(text, small_font, TEXT_COLOR, small_digit_font)
     message_poses = make_poses(message_letters, "normal")
@@ -525,6 +530,7 @@ class GameState:
         self.guessed_list = []
         self.round_over = False
         self.typed_guess = ""
+        self.message = ""
 
     def result(self):
         return logic.game_result(self.lives, self.tokens, self.tokens_needed)
@@ -608,12 +614,14 @@ heart_frames_red = load_heart_frames("red")
 heart_frames_gold = load_heart_frames("gold")
 heart_frames_empty = load_heart_frames("empty")
 
+token_frames_filled_white = load_frames(TOKENS_FILLED_DIR, "token_filled", TOKEN_SIZE)
 token_frames_filled = []
-for frame in load_frames(TOKENS_FILLED_DIR, "token_filled", TOKEN_SIZE):
+for frame in token_frames_filled_white:
     token_frames_filled.append(tint_image(frame, ACCENT_COLOR))
 
+token_frames_empty_white = load_frames(TOKENS_EMPTY_DIR, "token_empty", TOKEN_SIZE)
 token_frames_empty = []
-for frame in load_frames(TOKENS_EMPTY_DIR, "token_empty", TOKEN_SIZE):
+for frame in token_frames_empty_white:
     token_frames_empty.append(tint_image(frame, MUTED_COLOR))
 
 # Width of the widest character you can type, so the box always fits
