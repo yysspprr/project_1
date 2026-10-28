@@ -18,20 +18,31 @@ import pygame
 # My files
 import game_logic as logic
 from config import *
+from themes import THEMES
 
 # =======================================================
 # 1.2 - Colors                                          #
 # =======================================================
 
-BG_COLOR = "#1e1e2e"
-TEXT_COLOR = "#cdd6f4"
-ACCENT_COLOR = "#f9e2af"
-FIELD_COLOR = "#313244"
-MUTED_COLOR = "#7f849c"
-OVERLAY_COLOR = (0, 0, 0, 160)      # black, partly see-through
-HISTORY_BOX_COLOR = (0, 0, 0, 60)   # black, mostly see-through
-RANGE_FILL_COLOR = ACCENT_COLOR
-BAR_COLOR = (0, 0, 0, 50)               # black, very see-through
+theme = "plain"
+mode = "dark"           # "dark" or "light"
+
+def set_palette(theme, mode):
+    global BG_COLOR, TEXT_COLOR, ACCENT_COLOR, FIELD_COLOR, MUTED_COLOR
+    global OVERLAY_COLOR, HISTORY_BOX_COLOR, RANGE_FILL_COLOR, BAR_COLOR
+
+    palette = THEMES[theme][mode]
+    BG_COLOR = palette["bg"]
+    TEXT_COLOR = palette["text"]
+    ACCENT_COLOR = palette["accent"]
+    FIELD_COLOR = palette["field"]
+    MUTED_COLOR = palette["muted"]
+    OVERLAY_COLOR = palette["overlay"]
+    HISTORY_BOX_COLOR = palette["history_box"]
+    RANGE_FILL_COLOR = palette["range_fill"]
+    BAR_COLOR = palette["bar"]
+
+set_palette(theme, mode)
 
 # =======================================================
 # 1.3 - Pygame setup                                    #
@@ -197,7 +208,7 @@ def jitter_points(points, amount=BOX_WOBBLE):
                          y + random.uniform(-amount, amount)))
     return jittered
 
-def make_box_image(points, rect, fill_color=FIELD_COLOR, line_color=TEXT_COLOR):
+def make_box_image(points, rect, fill_color, line_color):
     pad = s(6)
     width = rect.width + pad * 2
     height = rect.height + pad * 2
@@ -383,7 +394,8 @@ def open_warning_modal(action, question):
     warning_modal_letters = make_letters(question, menu_font, TEXT_COLOR)
     warning_modal_poses = make_poses(warning_modal_letters, "normal")
 
-    warning_modal_image = make_box_image(jitter_points(warning_modal_base_points), warning_modal_panel)
+    warning_modal_image = make_box_image(jitter_points(warning_modal_base_points), warning_modal_panel,
+                                        FIELD_COLOR, TEXT_COLOR)
 
 def make_entry_box(max_digits):
     global entry_box, entry_base_points, entry_image
@@ -393,7 +405,7 @@ def make_entry_box(max_digits):
     entry_box = pygame.Rect(0, 0, width, ENTRY_BOX_HEIGHT)
     entry_box.center = (CENTER_X, ENTRY_BOX_Y)
     entry_base_points = rounded_box_points(entry_box)
-    entry_image = make_box_image(jitter_points(entry_base_points), entry_box)
+    entry_image = make_box_image(jitter_points(entry_base_points), entry_box, FIELD_COLOR, TEXT_COLOR)
 
 def make_history_box(max_tries, max_digits):
     global history_box, history_base_points, history_image
@@ -664,7 +676,8 @@ warning_modal_overlay.fill(OVERLAY_COLOR)
 warning_modal_panel = pygame.Rect((0, 0), WARNING_MODAL_SIZE)
 warning_modal_panel.center = (CENTER_X, HEIGHT // 2)
 warning_modal_base_points = rounded_box_points(warning_modal_panel, radius=s(16), edge_steps=16)
-warning_modal_image = make_box_image(jitter_points(warning_modal_base_points), warning_modal_panel)
+warning_modal_image = make_box_image(jitter_points(warning_modal_base_points), warning_modal_panel,
+                                        FIELD_COLOR, TEXT_COLOR)
 
 # Filled in by open_warning_modal
 warning_modal_letters = []
@@ -852,7 +865,7 @@ while running:
         tries_poses = make_poses(tries_letters, "subtle")
 
         entry_points = jitter_points(entry_base_points)
-        entry_image = make_box_image(entry_points, entry_box)
+        entry_image = make_box_image(entry_points, entry_box, FIELD_COLOR, TEXT_COLOR)
 
         history_image = make_box_image(jitter_points(history_base_points), history_box,
                                        HISTORY_BOX_COLOR, None)
