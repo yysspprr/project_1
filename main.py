@@ -175,14 +175,14 @@ def reanimate(sprite):
 
 def draw_button(button, y, center_x=CENTER_X, layer="screen"):
     # Only buttons on the top layer react to the mouse: modal, then panel, then screen
-    if game.warning_modal_open == True:
+    if game.warning_modal_open:
         can_hover = layer == "modal"
-    elif game.settings_open == True:
+    elif game.settings_open:
         can_hover = layer == "panel"
     else:
         can_hover = layer == "screen"
 
-    if can_hover == True and button["rect"].collidepoint(pygame.mouse.get_pos()):
+    if can_hover and button["rect"].collidepoint(pygame.mouse.get_pos()):
         letters = button["hover_letters"]
     else:
         letters = button["letters"]
@@ -205,8 +205,8 @@ def make_icon_button(name):
     }
 
 def draw_icon_button(icon, center_x, y):
-    can_hover = game.warning_modal_open == False and (game.settings_open == False or icon is settings_icon)
-    if can_hover == True and icon["rect"].collidepoint(pygame.mouse.get_pos()):
+    can_hover = not game.warning_modal_open and (not game.settings_open or icon is settings_icon)
+    if can_hover and icon["rect"].collidepoint(pygame.mouse.get_pos()):
         image = icon["hover_frames"][icon["frame"]]
     else:
         image = icon["frames"][icon["frame"]]
@@ -355,9 +355,9 @@ def end_round(won_round):
     set_tokens()
 
     result = game.result()
-    if result == "game_won":
+    if result == "game won":
         set_game_message("you won the game!")
-    elif result == "game_lost":
+    elif result == "game lost":
         set_game_message(f"game over! it was {game.secret}")
 
 def set_game_message(text):
@@ -388,7 +388,7 @@ def set_hearts():
 def heart_slots():
     slots = []
     for position in range(logic.STARTING_LIVES):
-        if game.result() == "game_won":
+        if game.result() == "game won":
             slots.append(heart_frames_gold)
         elif position < game.lives:
             slots.append(heart_frames_red)
@@ -488,7 +488,7 @@ def set_range_labels():
     ]
 
     # Round over: the fill has shrunk to the secret, so show the answer
-    if game.round_over == True:
+    if game.round_over:
         range_labels.append(make_label(str(game.secret), range_label_font, TEXT_COLOR,
                                        x=range_fill.centerx, y=above_y))
         return
@@ -639,13 +639,13 @@ def close_settings():
 
     # A different window size only takes effect after a restart
     if pick_window_size() != window_size:
-        if game.screen == "game" and game.has_progress() == True:
+        if game.screen == "game" and game.has_progress():
             open_warning_modal("resize", "restart to resize?")
         else:
             restart_program()
 
 def toggle_settings():
-    if game.settings_open == True:
+    if game.settings_open:
         close_settings()
     else:
         game.settings_open = True
@@ -690,7 +690,7 @@ class GameState:
         return logic.has_progress(self.lives, self.tokens, self.tokens_needed, self.rounds_played, self.try_count)
 
     def narrowed_range(self):
-        if self.round_over == True:
+        if self.round_over:
             return self.secret, self.secret
         return logic.narrowed_range(self.guesses, self.secret, self.range_lowest, self.range_highest)
 
@@ -829,7 +829,7 @@ def handle_event(event):
 
 def handle_quit():
     # The window's close button: ask first if there's a game to lose
-    if game.screen == "game" and game.has_progress() == True and game.warning_modal_open == False:
+    if game.screen == "game" and game.has_progress() and not game.warning_modal_open:
         open_warning_modal("quit", "quit the game?")
     else:
         game.running = False
@@ -840,11 +840,11 @@ def handle_click(pos):
     # Whatever is on top gets the click: modal, then the gear, then the panel, then the rest
     clicked_icon = clicked_bar_icon(pos)
 
-    if game.warning_modal_open == True:
+    if game.warning_modal_open:
         click_warning_modal(pos)
     elif clicked_icon is settings_icon:
         toggle_settings()
-    elif game.settings_open == True:
+    elif game.settings_open:
         click_settings_panel(pos)
     elif clicked_icon is not None:
         click_bar_icon(clicked_icon)
@@ -888,19 +888,19 @@ def click_settings_panel(pos):
 
 def click_bar_icon(icon):
     if icon is home_icon:
-        if game.has_progress() == True:
+        if game.has_progress():
             open_warning_modal("menu", "leave this game?")
         else:
             game.screen = "menu"
     elif icon is back_icon:
         if game.screen == "difficulty":
             game.screen = "menu"
-        elif game.has_progress() == True:
+        elif game.has_progress():
             open_warning_modal("difficulty", "leave this game?")
         else:
             game.screen = "difficulty"
     elif icon is restart_icon:
-        if game.has_progress() == True:
+        if game.has_progress():
             open_warning_modal("restart", "restart this game?")
         else:
             start_game(game.difficulty)
@@ -924,7 +924,7 @@ def click_difficulty(pos):
 # --- Keyboard ---
 
 def handle_key(event):
-    if game.warning_modal_open == True:
+    if game.warning_modal_open:
         return                                  # the modal only listens to the mouse
 
     if event.key == pygame.K_ESCAPE:
@@ -933,8 +933,8 @@ def handle_key(event):
         change_setting("mode", 1)
     elif event.key == pygame.K_t:
         change_setting("theme", 1)
-    elif game.screen == "game" and game.settings_open == False:
-        if game.round_over == True:
+    elif game.screen == "game" and not game.settings_open:
+        if game.round_over:
             if event.key == pygame.K_SPACE:
                 continue_after_round()
         else:
@@ -992,19 +992,19 @@ def update(dt):
     # Everything that moves on its own: the background, the settings bar and the wobble
     global last_wobble
 
-    if background is not None and game.warning_modal_open == False:
+    if background is not None and not game.warning_modal_open:
         background.update(dt)
     slide_settings_bar(dt)
 
     now = pygame.time.get_ticks()
-    if now - last_wobble >= WOBBLE_INTERVAL and game.warning_modal_open == False:
+    if now - last_wobble >= WOBBLE_INTERVAL and not game.warning_modal_open:
         wobble_everything()
         last_wobble = now
 
 def slide_settings_bar(dt):
     # Move the bar a little toward open or closed
     step = dt / SETTINGS_SLIDE_TIME
-    if game.settings_open == True:
+    if game.settings_open:
         game.settings_slide = min(game.settings_slide + step, 1)
     else:
         game.settings_slide = max(game.settings_slide - step, 0)
@@ -1057,7 +1057,7 @@ def draw_screen():
     draw_bar()
     draw_settings_panel()
 
-    if game.warning_modal_open == True:
+    if game.warning_modal_open:
         draw_warning_modal()
 
 # --- Screens ---
@@ -1089,7 +1089,7 @@ def draw_game():
         draw_range_bar()
     draw_label(labels["message"], CENTER_X, MESSAGE_Y)
     draw_entry()
-    if game.round_over == True:
+    if game.round_over:
         draw_space_cue()
 
     # Record: tries left and the guess history
@@ -1110,12 +1110,12 @@ def draw_entry():
     draw_box(boxes["entry"])
 
     # The typed digits, plus a blinking cursor while you can type
-    can_type = (game.round_over == False and game.warning_modal_open == False
-                and game.settings_open == False and len(game.typed_guess) < game.max_digits)
+    can_type = (not game.round_over and not game.warning_modal_open
+                and not game.settings_open and len(game.typed_guess) < game.max_digits)
 
     line_letters = labels["typed"]["letters"]
     line_poses = labels["typed"]["poses"]
-    if can_type == True:
+    if can_type:
         if (pygame.time.get_ticks() // CURSOR_BLINK) % 2 == 0:
             cursor_image = cursor_on
         else:
@@ -1128,7 +1128,7 @@ def draw_entry():
                     entry_box.centery - typed_font.get_height() // 2, align="left")
 
     # The enter key, once there's something to submit
-    if game.typed_guess != "" and game.round_over == False:
+    if game.typed_guess != "" and not game.round_over:
         enter_x = entry_box.right - ENTER_KEY_INSET - ENTER_KEY_SIZE[0] // 2
         enter_y = entry_box.centery - ENTER_KEY_SIZE[1] // 2
         draw_label(sprites["enter"], enter_x, enter_y)

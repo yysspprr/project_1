@@ -21,9 +21,9 @@ def check_guess(guess, secret, range_lowest, range_highest, guesses):
 
 def game_result(lives, tokens, tokens_needed):
     if lives == 0:
-        return "game_lost"
+        return "game lost"
     elif tokens == tokens_needed:
-        return "game_won"
+        return "game won"
     else:
         return "playing"
 
@@ -45,7 +45,7 @@ def max_digits(range_lowest, range_highest):
     return max(len(str(range_lowest)), len(str(range_highest)))
 
 def after_round(lives, tokens, won_round, difficulty):
-    if won_round == True:
+    if won_round:
         if lives < STARTING_LIVES:
             lives += 1          # recovering: win back a life
         else:
