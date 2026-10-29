@@ -526,7 +526,7 @@ def bar_icons():
 
 def settings_offset():
     # How many pixels the bar has slid up: 0 when closed, the panel height when open
-    eased = 1 - (1 - settings_slide) ** 2          # fast at first, slowing down at the end
+    eased = 1 - (1 - game.settings_slide) ** 2          # fast at first, slowing down at the end
     return round(SETTINGS_PANEL_HEIGHT * eased)
 
 def clicked_bar_icon(pos):
@@ -666,6 +666,8 @@ class GameState:
         self.warning_modal_open = False
         self.warning_modal_action = ""
         self.settings_open = False
+        self.running = True
+        self.settings_slide = 0         # 0 = closed, 1 = fully open; changes a bit every frame
 
         # Difficulty
         self.difficulty = "normal"
@@ -781,7 +783,6 @@ bar_surface = pygame.Surface((WIDTH, BAR_HEIGHT), pygame.SRCALPHA)
 SETTINGS_ROWS = ["theme", "mode", "window size"]
 
 settings_panel_surface = pygame.Surface((WIDTH, SETTINGS_PANEL_HEIGHT), pygame.SRCALPHA)
-settings_slide = 0              # 0 = closed, 1 = fully open; changes a bit every frame
 
 # =======================================================
 # 3.8 - Warning modal setup                             #
@@ -818,153 +819,184 @@ apply_theme(theme, mode)
 ### =====================================================
 
 # =======================================================
+# 4.1 - Event handling                                  #
+# =======================================================
+
+def handle_event(event):
+    if event.type == pygame.QUIT:
+        handle_quit()
+    elif event.type == pygame.MOUSEBUTTONDOWN:
+        handle_click(event.pos)
+    elif event.type == pygame.KEYDOWN:
+        handle_key(event)
+
+def handle_quit():
+    # The window's close button: ask first if there's a game to lose
+    if game.screen == "game" and game.has_progress() == True and game.warning_modal_open == False:
+        open_warning_modal("quit", "quit the game?")
+    else:
+        game.running = False
+
+# --- Mouse ---
+
+def handle_click(pos):
+    # Whatever is on top gets the click: modal, then the gear, then the panel, then the rest
+    clicked_icon = clicked_bar_icon(pos)
+
+    if game.warning_modal_open == True:
+        click_warning_modal(pos)
+    elif clicked_icon is settings_icon:
+        toggle_settings()
+    elif game.settings_open == True:
+        click_settings_panel(pos)
+    elif clicked_icon is not None:
+        click_bar_icon(clicked_icon)
+    elif game.screen == "menu":
+        click_menu(pos)
+    elif game.screen == "difficulty":
+        click_difficulty(pos)
+
+def click_warning_modal(pos):
+    if warning_modal_yes_button["rect"].collidepoint(pos):
+        game.warning_modal_open = False
+        confirm_warning(game.warning_modal_action)
+    elif warning_modal_no_button["rect"].collidepoint(pos):
+        game.warning_modal_open = False
+
+def confirm_warning(action):
+    # The player clicked "yes": do what the modal asked about
+    if action == "menu":
+        game.screen = "menu"
+    elif action == "quit":
+        game.running = False
+    elif action == "restart":
+        start_game(game.difficulty)
+    elif action == "difficulty":
+        game.screen = "difficulty"
+    elif action == "resize":
+        restart_program()
+
+def click_settings_panel(pos):
+    if pos[1] < HEIGHT - BAR_HEIGHT - settings_offset():
+        close_settings()                        # a click above the bar closes the panel
+        return
+
+    for row in settings_rows:
+        if row["left"]["rect"].collidepoint(pos):
+            change_setting(row["name"], -1)
+            break
+        elif row["right"]["rect"].collidepoint(pos):
+            change_setting(row["name"], 1)
+            break
+
+def click_bar_icon(icon):
+    if icon is home_icon:
+        if game.has_progress() == True:
+            open_warning_modal("menu", "leave this game?")
+        else:
+            game.screen = "menu"
+    elif icon is back_icon:
+        if game.screen == "difficulty":
+            game.screen = "menu"
+        elif game.has_progress() == True:
+            open_warning_modal("difficulty", "leave this game?")
+        else:
+            game.screen = "difficulty"
+    elif icon is restart_icon:
+        if game.has_progress() == True:
+            open_warning_modal("restart", "restart this game?")
+        else:
+            start_game(game.difficulty)
+
+def click_menu(pos):
+    if new_game_button["rect"].collidepoint(pos):
+        game.screen = "difficulty"
+    elif free_mode_button["rect"].collidepoint(pos):
+        print("free mode clicked")
+    elif exit_button["rect"].collidepoint(pos):
+        game.running = False
+
+def click_difficulty(pos):
+    if easy_button["rect"].collidepoint(pos):
+        start_game("easy")
+    elif normal_button["rect"].collidepoint(pos):
+        start_game("normal")
+    elif hard_button["rect"].collidepoint(pos):
+        start_game("hard")
+
+# --- Keyboard ---
+
+def handle_key(event):
+    if game.warning_modal_open == True:
+        return                                  # the modal only listens to the mouse
+
+    if event.key == pygame.K_ESCAPE:
+        toggle_settings()
+    elif event.key == pygame.K_l:
+        change_setting("mode", 1)
+    elif event.key == pygame.K_t:
+        change_setting("theme", 1)
+    elif game.screen == "game" and game.settings_open == False:
+        if game.round_over == True:
+            if event.key == pygame.K_SPACE:
+                continue_after_round()
+        else:
+            handle_typing(event)
+
+def handle_typing(event):
+    if event.unicode.isdigit() and len(game.typed_guess) < game.max_digits:
+        set_typed(game.typed_guess + event.unicode)
+    elif event.key == pygame.K_BACKSPACE:
+        set_typed(game.typed_guess[:-1])
+    elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+        submit_guess()
+
+# What the game says after each kind of guess
+GUESS_MESSAGES = {
+    "invalid": "type a number first!",
+    "out of range": "out of range!",
+    "repeat": "already guessed!",
+    "too high": "too high!",
+    "too low": "too low!",
+    "correct": "correct!",
+}
+
+def submit_guess():
+    result = logic.check_guess(game.typed_guess, game.secret, game.range_lowest,
+                               game.range_highest, game.guessed_list)
+    set_typed("")
+    set_game_message(GUESS_MESSAGES[result])
+
+    if result in ("too high", "too low", "correct"):
+        game.try_count += 1
+        set_tries_label()
+        set_history()
+        make_range_fill()
+
+    if result == "correct":
+        end_round(True)
+    elif game.try_count == game.max_tries:
+        set_game_message(f"out of tries! it was {game.secret}...")
+        end_round(False)
+
+def continue_after_round():
+    # Space after a round: the next round, or a new game if this one is over
+    if game.result() == "playing":
+        next_round()
+    else:
+        start_game(game.difficulty)
+
+# =======================================================
 # 4.1 - Loop setup                                      #
 # =======================================================
 
 last_wobble = 0
 dt = 0
-running = True
 
-while running:
-
-    # ===================================================
-    # 4.2 - Handle events                               #
-    # ===================================================
+while game.running:
 
     for event in pygame.event.get():
-
-        # Window close
-        if event.type == pygame.QUIT:
-            if game.screen == "game" and game.has_progress() == True and game.warning_modal_open == False:
-                open_warning_modal("quit", "quit the game?")
-            else:
-                running = False
-
-        # Mouse clicks
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            clicked_icon = clicked_bar_icon(event.pos)
-
-            if game.warning_modal_open == True:
-                if warning_modal_yes_button["rect"].collidepoint(event.pos):
-                    game.warning_modal_open = False
-                    if game.warning_modal_action == "menu":
-                        game.screen = "menu"
-                    elif game.warning_modal_action == "quit":
-                        running = False
-                    elif game.warning_modal_action == "restart":
-                        start_game(game.difficulty)
-                    elif game.warning_modal_action == "difficulty":
-                        game.screen = "difficulty"
-                    elif game.warning_modal_action == "resize":
-                        restart_program()
-                elif warning_modal_no_button["rect"].collidepoint(event.pos):
-                    game.warning_modal_open = False
-
-            elif clicked_icon is settings_icon:
-                toggle_settings()
-            elif game.settings_open == True:
-                if event.pos[1] < HEIGHT - BAR_HEIGHT - settings_offset():
-                    close_settings()                    # a click above the bar closes the panel
-                else:
-                    for row in settings_rows:
-                        if row["left"]["rect"].collidepoint(event.pos):
-                            change_setting(row["name"], -1)
-                            break
-                        elif row["right"]["rect"].collidepoint(event.pos):
-                            change_setting(row["name"], 1)
-                            break
-
-            elif clicked_icon is home_icon:
-                if game.has_progress() == True:
-                    open_warning_modal("menu", "leave this game?")
-                else:
-                    game.screen = "menu"
-            elif clicked_icon is back_icon:
-                if game.screen == "difficulty":
-                    game.screen = "menu"
-                elif game.has_progress() == True:
-                    open_warning_modal("difficulty", "leave this game?")
-                else:
-                    game.screen = "difficulty"
-            elif clicked_icon is restart_icon:
-                if game.has_progress() == True:
-                    open_warning_modal("restart", "restart this game?")
-                else:
-                    start_game(game.difficulty)
-
-            elif game.screen == "menu":
-                if new_game_button["rect"].collidepoint(event.pos):
-                    game.screen = "difficulty"
-                elif free_mode_button["rect"].collidepoint(event.pos):
-                    print("free mode clicked")
-                elif exit_button["rect"].collidepoint(event.pos):
-                    running = False
-            elif game.screen == "difficulty":
-                if easy_button["rect"].collidepoint(event.pos):
-                    start_game("easy")
-                elif normal_button["rect"].collidepoint(event.pos):
-                    start_game("normal")
-                elif hard_button["rect"].collidepoint(event.pos):
-                    start_game("hard")
-
-        # Keyboard
-        if (event.type == pygame.KEYDOWN and game.screen == "game" and game.round_over == False
-                and game.warning_modal_open == False and game.settings_open == False):
-
-            if event.unicode.isdigit() and len(game.typed_guess) < game.max_digits:
-                set_typed(game.typed_guess + event.unicode)
-
-            elif event.key == pygame.K_BACKSPACE:
-                set_typed(game.typed_guess[:-1])
-            elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                result = (logic.check_guess(game.typed_guess, game.secret, game.range_lowest,
-                                            game.range_highest, game.guessed_list))
-                set_typed("")
-
-                if result in ("too high", "too low", "correct"):
-                    game.try_count += 1
-                    set_tries_label()
-                    set_history()
-                    make_range_fill()
-
-                if result == "invalid":
-                    set_game_message("type a number first!")
-                elif result == "out of range":
-                    set_game_message("out of range!")
-                elif result == "repeat":
-                    set_game_message("already guessed!")
-                elif result == "too high":
-                    set_game_message("too high!")
-                elif result == "too low":
-                    set_game_message("too low!")
-                else:
-                    set_game_message("correct!")
-                    end_round(True)
-
-                if result != "correct" and game.try_count == game.max_tries:
-                    set_game_message(f"out of tries! it was {game.secret}...")
-                    end_round(False)
-
-        # Space: move on once a round is over
-        if (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and game.screen == "game" 
-            and game.round_over == True and game.warning_modal_open == False and game.settings_open == False):
-
-            if game.result() == "playing":
-                next_round()
-            else:
-                start_game(game.difficulty)
-
-        # L switches between light and dark mode
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_l and game.warning_modal_open == False:
-            change_setting("mode", 1)
-
-        # T goes to the next theme
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_t and game.warning_modal_open == False:
-            change_setting("theme", 1)
-
-        # Esc opens and closes the settings panel
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and game.warning_modal_open == False:
-            toggle_settings()
+        handle_event(event)
 
     # ===================================================
     # 4.3 - Update                                      #
@@ -978,9 +1010,9 @@ while running:
     # Slide the bar toward open or closed
     step = dt / SETTINGS_SLIDE_TIME
     if game.settings_open == True:
-        settings_slide = min(settings_slide + step, 1)
+        game.settings_slide = min(game.settings_slide + step, 1)
     else:
-        settings_slide = max(settings_slide - step, 0)
+        game.settings_slide = max(game.settings_slide - step, 0)
 
     if now - last_wobble >= WOBBLE_INTERVAL and game.warning_modal_open == False:
 
@@ -1006,7 +1038,6 @@ while running:
             icon["poses"] = make_poses([icon["frames"][0]], "subtle")
 
         # Game screen
-        
         for label in range_labels:
             rewobble(label)
 
