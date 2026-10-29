@@ -11,6 +11,8 @@
 # Built-in modules
 import math
 import random
+import subprocess
+import sys
 
 # Installed modules
 import pygame
@@ -602,6 +604,8 @@ def setting_choices(name):
         return list(THEMES)
     elif name == "mode":
         return ["dark", "light"]
+    elif name == "window size":
+        return ["auto", "small", "medium", "large"]
 
 def change_setting(name, step):
     # Go to the next (step 1) or previous (step -1) choice, wrapping around, and save it
@@ -619,10 +623,32 @@ def set_settings_rows():
         settings_rows.append({
             "name": name,
             "label": make_label(name, small_font, MUTED_COLOR, SETTINGS_LABEL_X, 0),
-            "value": make_label(settings(name), small_font, TEXT_COLOR, SETTINGS_VALUE_X, 0),
+            "value": make_label(settings[name], small_font, TEXT_COLOR, SETTINGS_VALUE_X, 0),
             "left": make_button("<"),
             "right": make_button(">"),
         })
+
+def restart_program():
+    # Start a fresh copy of the game, then close this one
+    pygame.quit()
+    subprocess.Popen([sys.executable] + sys.argv)
+    sys.exit()
+
+def close_settings():
+    game.settings_open = False
+
+    # A different window size only takes effect after a restart
+    if pick_window_size() != window_size:
+        if game.screen == "game" and game.has_progress() == True:
+            open_warning_modal("resize", "restart to resize?")
+        else:
+            restart_program()
+
+def toggle_settings():
+    if game.settings_open == True:
+        close_settings()
+    else:
+        game.settings_open = True
 
 # =======================================================
 # 2.4 - Game state class                                #
@@ -749,7 +775,8 @@ bar_surface = pygame.Surface((WIDTH, BAR_HEIGHT), pygame.SRCALPHA)
 # 3.7 - Settings panel setup                            #
 # =======================================================
 
-SETTINGS_ROWS = ["theme", "mode"]           # the window size row comes in S3
+SETTINGS_ROWS = ["theme", "mode", "window size"]
+
 settings_panel_surface = pygame.Surface((WIDTH, SETTINGS_PANEL_HEIGHT), pygame.SRCALPHA)
 settings_slide = 0              # 0 = closed, 1 = fully open; changes a bit every frame
 
@@ -829,14 +856,16 @@ while running:
                         start_game(game.difficulty)
                     elif game.warning_modal_action == "difficulty":
                         game.screen = "difficulty"
+                    elif game.warning_modal_action == "resize":
+                        restart_program()
                 elif warning_modal_no_button["rect"].collidepoint(event.pos):
                     game.warning_modal_open = False
 
             elif clicked_icon is settings_icon:
-                game.settings_open = not game.settings_open
+                toggle_settings()
             elif game.settings_open == True:
                 if event.pos[1] < HEIGHT - BAR_HEIGHT - settings_offset():
-                    game.settings_open = False         # a click above the bar closes the panel
+                    close_settings()                    # a click above the bar closes the panel
                 else:
                     for row in settings_rows:
                         if row["left"]["rect"].collidepoint(event.pos):
@@ -926,7 +955,6 @@ while running:
                 start_game(game.difficulty)
 
         # L switches between light and dark mode
-        # L switches between light and dark mode
         if event.type == pygame.KEYDOWN and event.key == pygame.K_l and game.warning_modal_open == False:
             change_setting("mode", 1)
 
@@ -936,7 +964,7 @@ while running:
 
         # Esc opens and closes the settings panel
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and game.warning_modal_open == False:
-            game.settings_open = not game.settings_open
+            toggle_settings()
 
     # ===================================================
     # 4.3 - Update                                      #
