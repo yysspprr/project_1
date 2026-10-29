@@ -17,11 +17,11 @@ import sys
 import pygame
 
 # My files
-import game.game_logic as logic
-from game.drawing import *
-from game.themes import THEMES
-from game.backgrounds import make_background
-from game.config import *
+import partials.game_logic as logic
+from partials.drawing import *
+from partials.themes import THEMES
+from partials.backgrounds import make_background
+from partials.config import *
 
 # =======================================================
 # 1.2 - Colors                                          #
@@ -151,7 +151,7 @@ def start_game(difficulty):
 
 def set_game_labels():
     labels["difficulty"] = make_label(f"{game.difficulty} mode", tiny_font, MUTED_COLOR, "subtle")
-    labels["range"] = make_label(f"({game.range_lowest}-{game.range_highest})", small_heading_font, TEXT_COLOR,
+    labels["range"] = make_label(f"({game.range_lowest} to {game.range_highest})", small_heading_font, TEXT_COLOR,
                                  "normal", small_heading_digit_font)
 
 def next_round():
@@ -197,8 +197,6 @@ def set_typed(text):
     labels["typed"] = make_label(text, typed_font, ACCENT_COLOR, "typed")
 
 def set_tries_label():
-    tries_left = game.max_tries - game.try_count
-
     if game.max_tries is None:
         if game.try_count == 1:
             text = "1 try"
@@ -338,7 +336,7 @@ def set_range_labels():
         needed = (below_width + above_width) / 2 + RANGE_LABEL_MIN_GAP
 
         if range_fill.width < needed:
-            range_labels.append(make_label(f"{below}-{above}", range_label_font, TEXT_COLOR,
+            range_labels.append(make_label(f"{below} to {above}", range_label_font, TEXT_COLOR,
                                            x=range_fill.centerx, y=above_y))
         else:
             range_labels.append(make_label(str(below), range_label_font, TEXT_COLOR, x=range_fill.left, y=above_y))
@@ -352,7 +350,7 @@ def bar_icons():
     # The icons on the left side of the bar, depending on the screen
     if game.screen == "game":
         return [home_icon, back_icon, restart_icon]
-    elif game.screen == "difficulty":
+    elif game.screen in ("difficulty", "free setup"):
         return [back_icon]
     else:
         return []
@@ -367,6 +365,13 @@ def clicked_bar_icon(pos):
     for icon in bar_icons() + [settings_icon]:
         if icon["rect"].collidepoint(pos):
             return icon
+        elif icon is back_icon:
+            if game.screen in ("difficulty", "free setup"):
+                game.screen = "menu"
+            elif game.has_progress():
+                open_warning_modal("back", "leave this game?")
+            else:
+                leave_game()
     return None
 
 def apply_theme():
@@ -414,6 +419,13 @@ def apply_theme():
     bar_surface.fill(BAR_COLOR)
     warning_modal_overlay.fill(OVERLAY_COLOR)
     settings_panel_surface.fill(BAR_COLOR)
+
+    # Free mode setup screen
+    labels["free_title"] = make_label("free mode", menu_font, TEXT_COLOR, "normal")
+    labels["free_from_label"] = make_label("from", tiny_font, MUTED_COLOR)
+    labels["free_to_label"] = make_label("to", tiny_font, MUTED_COLOR)
+    set_free_inputs()
+    set_free_message(game.free_message)
 
     # Game screen: boxes and setters, rebuilt from the current game
     make_entry_box(game.max_digits)
@@ -487,7 +499,81 @@ def toggle_settings():
         game.settings_open = True
 
 # =======================================================
-# 2.4 - Game state class                                #
+# 2.4 - Free mode setup functions                       #
+# =======================================================
+
+def open_free_setup():
+    # Show the setup screen, starting from the last range that was used
+    game.screen = "free setup"
+    game.free_text["from"] = str(settings["free from"])
+    game.free_text["to"] = str(settings["free to"])
+    game.free_focus = "from"
+    set_free_message("")
+    set_free_inputs()
+
+def set_free_inputs():
+    # The two number boxes; the one you're typing in gets a gold outline
+    width = ENTRY_PADDING * 2 + FREE_BOX_CHARS * typed_char_width
+
+    for field, center_x in (("from", CENTER_X - FREE_BOX_GAP), ("to", CENTER_X + FREE_BOX_GAP)):
+        rect = pygame.Rect(0, 0, width, ENTRY_BOX_HEIGHT)
+        rect.center = (center_x, FREE_BOX_Y)
+
+        if field == game.free_focus:
+            line_color = ACCENT_COLOR
+        else:
+            line_color = TEXT_COLOR
+
+        boxes[f"free_{field}"] = make_box(rect, FIELD_COLOR, line_color)
+        labels[f"free_{field}"] = make_label(game.free_text[field], typed_font, ACCENT_COLOR, "typed")
+
+def set_free_message(text):
+    game.free_message = text
+    labels["free_message"] = make_label(text, small_font, TEXT_COLOR, "normal", small_digit_font)
+
+def type_in_free_box(event):
+    field = game.free_focus
+    text = game.free_text[field]
+
+    if event.key == pygame.K_TAB:
+        if field == "from":
+            game.free_focus = "to"
+        else:
+            game.free_focus = "from"
+    elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+        start_free_game()
+        return
+    elif event.key == pygame.K_BACKSPACE:
+        text = text[:-1]
+    elif event.unicode.isdigit() and len(text.lstrip("-")) < 4:
+        text = text + event.unicode
+    elif event.unicode == "-" and text == "":
+        text = "-"                              # a minus only as the very first character
+
+    game.free_text[field] = text
+    set_free_inputs()
+
+def start_free_game():
+    # Check the range; if it's fine, save it and start
+    try:
+        low = int(game.free_text["from"])
+        high = int(game.free_text["to"])
+    except ValueError:
+        set_free_message("fill in both numbers!")
+        return
+
+    problem = logic.free_range_problem(low, high)
+    if problem is not None:
+        set_free_message(problem)
+        return
+
+    settings["free from"] = low
+    settings["free to"] = high
+    save_settings(settings)
+    start_game("free")
+
+# =======================================================
+# 2.5 - Game state class                                #
 # =======================================================
 
 class GameState:
@@ -507,6 +593,11 @@ class GameState:
         self.max_digits = logic.max_digits(self.range_lowest, self.range_highest)
 
         self.history_size = self.max_tries         # how many guesses the history shows
+
+        # Free mode setup screen
+        self.free_text = {"from": "", "to": ""}     # what's typed in each box
+        self.free_focus = "from"                    # which box you're typing in
+        self.free_message = ""
 
         # Game
         self.lives = logic.STARTING_LIVES
@@ -580,6 +671,8 @@ easy_button = make_button("easy")
 normal_button = make_button("normal")
 hard_button = make_button("hard")
 
+free_start_button = make_button("start")
+
 # =======================================================
 # 3.4 - Game state                                      #
 # =======================================================
@@ -640,6 +733,7 @@ warning_modal_no_button = make_button("no")
 all_buttons = [
     new_game_button, free_mode_button, exit_button,
     easy_button, normal_button, hard_button,
+    free_start_button,
     warning_modal_yes_button, warning_modal_no_button,
 ]
 
@@ -697,6 +791,8 @@ def handle_click(pos):
         click_menu(pos)
     elif game.screen == "difficulty":
         click_difficulty(pos)
+    elif game.screen == "free setup":
+        click_free_setup(pos)
 
 def click_warning_modal(pos):
     if warning_modal_yes_button["rect"].collidepoint(pos):
@@ -713,10 +809,17 @@ def confirm_warning(action):
         game.running = False
     elif action == "restart":
         start_game(game.difficulty)
-    elif action == "difficulty":
-        game.screen = "difficulty"
+    elif action == "back":
+        leave_game()
     elif action == "resize":
         restart_program()
+
+def leave_game():
+    # Back from a game: to the free mode setup or the difficulty screen
+    if game.difficulty == "free":
+        open_free_setup()
+    else:
+        game.screen = "difficulty"
 
 def click_settings_panel(pos):
     if pos[1] < HEIGHT - BAR_HEIGHT - settings_offset():
@@ -754,7 +857,7 @@ def click_menu(pos):
     if new_game_button["rect"].collidepoint(pos):
         game.screen = "difficulty"
     elif free_mode_button["rect"].collidepoint(pos):
-        start_game("free")
+        open_free_setup()
     elif exit_button["rect"].collidepoint(pos):
         game.running = False
 
@@ -765,6 +868,16 @@ def click_difficulty(pos):
         start_game("normal")
     elif hard_button["rect"].collidepoint(pos):
         start_game("hard")
+
+def click_free_setup(pos):
+    if boxes["free_from"]["rect"].collidepoint(pos):
+        game.free_focus = "from"
+        set_free_inputs()
+    elif boxes["free_to"]["rect"].collidepoint(pos):
+        game.free_focus = "to"
+        set_free_inputs()
+    elif free_start_button["rect"].collidepoint(pos):
+        start_free_game()
 
 # --- Keyboard ---
 
@@ -784,6 +897,8 @@ def handle_key(event):
                 continue_after_round()
         else:
             handle_typing(event)
+    elif game.screen == "free setup" and not game.settings_open:
+        type_in_free_box(event)
 
 def handle_typing(event):
     if event.unicode.isdigit() and len(game.typed_guess) < game.max_digits:
@@ -896,6 +1011,8 @@ def draw_screen():
         draw_menu()
     elif game.screen == "difficulty":
         draw_difficulty()
+    elif game.screen == "free setup":
+        draw_free_setup()
     elif game.screen == "game":
         draw_game()
 
@@ -918,6 +1035,30 @@ def draw_difficulty():
     draw_button(easy_button, EASY_Y)
     draw_button(normal_button, NORMAL_Y)
     draw_button(hard_button, HARD_Y)
+
+def draw_free_setup():
+    draw_label(labels["free_title"], CENTER_X, TITLE_Y)
+
+    for field in ("from", "to"):
+        rect = boxes[f"free_{field}"]["rect"]
+        label_y = rect.top - FREE_LABEL_GAP - tiny_font.get_height()
+        draw_label(labels[f"free_{field}_label"], rect.centerx, label_y)
+        draw_box(boxes[f"free_{field}"])
+
+        # The typed number, plus a blinking cursor in the box you're typing in
+        line_letters = labels[f"free_{field}"]["letters"]
+        line_poses = labels[f"free_{field}"]["poses"]
+        typing_here = field == game.free_focus and not game.settings_open
+        if typing_here and (pygame.time.get_ticks() // CURSOR_BLINK) % 2 == 0:
+            line_letters = line_letters + [cursor_on]
+            line_poses = line_poses + sprites["cursor"]["poses"]
+
+        if len(line_letters) > 0:
+            draw_wobbly(line_letters, line_poses, rect.left + ENTRY_PADDING,
+                        rect.centery - typed_font.get_height() // 2, align="left")
+
+    draw_label(labels["free_message"], CENTER_X, FREE_MESSAGE_Y)
+    draw_button(free_start_button, FREE_START_Y)
 
 def draw_game():
     # Status: what you're guessing, and how you're doing

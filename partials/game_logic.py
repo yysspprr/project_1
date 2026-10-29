@@ -3,6 +3,14 @@ FREE_LOWEST = -9999             # the widest range free mode allows
 FREE_HIGHEST = 9999
 FREE_HISTORY_SIZE = 10          # free mode shows the last this-many guesses
 
+def free_range_problem(low, high):
+    # What's wrong with a free mode range, or None if it's fine
+    if low < FREE_LOWEST or high > FREE_HIGHEST:
+        return f"stay between {FREE_LOWEST} and {FREE_HIGHEST}!"
+    if low >= high:
+        return "'from' must be lower than 'to'!"
+    return None
+
 def check_guess(guess, secret, range_lowest, range_highest, guesses):
     try:
         number = int(guess)
@@ -38,11 +46,11 @@ def has_progress(lives, tokens, tokens_needed, rounds_played, try_count):
 def difficulty_settings(difficulty):
     # lowest, highest, max tries, tokens needed to win
     if difficulty == "easy":
-        return 1, 50, 10, 3
+        return 0, 50, 10, 3
     elif difficulty == "hard":
-        return 1, 100, 7, 7
+        return 0, 100, 7, 7
     else:
-        return 1, 100, 10, 5
+        return 0, 100, 10, 5
 
 def max_digits(range_lowest, range_highest):
     return max(len(str(range_lowest)), len(str(range_highest)))

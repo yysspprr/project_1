@@ -6,7 +6,7 @@ import random
 
 import pygame
 
-from game.config import WOBBLE_STYLES, BOX_WOBBLE, BOX_SCALE, FRAME_COUNT, s
+from partials.config import WOBBLE_STYLES, BOX_WOBBLE, BOX_SCALE, FRAME_COUNT, s
 
 # =======================================================
 # Wobbly text and images                                #

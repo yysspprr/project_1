@@ -16,14 +16,13 @@ import pygame
 # 1.2 - Saved settings                                    #
 # =======================================================
 
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).parent.parent     # the project folder: one up from game/
 SETTINGS_PATH = BASE_DIR / "settings.json"
 
 DEFAULT_SETTINGS = {
     "theme": "plain",
     "mode": "dark",
     "window size": "auto",
-
     "free from": 1,
     "free to": 100,
     "free range bar": True,
@@ -144,6 +143,14 @@ EXIT_Y = s(350)
 EASY_Y = s(160)
 NORMAL_Y = s(220)
 HARD_Y = s(280)
+
+# Free mode setup screen
+FREE_BOX_Y = s(170)                     # center of the two number boxes
+FREE_BOX_GAP = s(85)                    # from the middle of the window to each box's center
+FREE_BOX_CHARS = 6                      # room inside a box: a minus, 4 digits and the cursor
+FREE_LABEL_GAP = s(6)                   # space between a box and its label above it
+FREE_MESSAGE_Y = s(230)
+FREE_START_Y = s(420)
 
 # Game screen
 HEADING_Y = s(10)
