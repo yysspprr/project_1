@@ -6,13 +6,42 @@
 # 1.1 - Imports                                         #
 # =======================================================
 
+import json
+
 from pathlib import Path
 
 import pygame
 
+# =======================================================
+# 1.2 Saved settings                                    #
+# =======================================================
+
+BASE_DIR = Path(__file__).parent
+SETTINGS_PATH = BASE_DIR / "settings.json"
+
+DEFAULT_SETTINGS = {
+    "theme": "plain",
+    "mode": "dark",
+    "window size": "auto",
+}
+
+def load_settings():
+    settings = dict(DEFAULT_SETTINGS)           # a copy, so the defaults stay untouched
+    try:
+        with open(SETTINGS_PATH) as file:
+            settings.update(json.load(file))
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass                                    # no file yet, or a broken one: keep the defaults
+    return settings
+
+def save_settings(settings):
+    with open(SETTINGS_PATH, "w") as file:
+        json.dump(settings, file, indent=4)
+
+settings = load_settings()
 
 # =======================================================
-# 1.2 - Window                                          #
+# 1.3 - Window                                          #
 # =======================================================
 
 pygame.init()
@@ -29,6 +58,10 @@ SCREEN_MARGIN = 120             # room for the taskbar and the window's title ba
 def pick_window_size():
     if FORCE_WINDOW_SIZE is not None:
         return FORCE_WINDOW_SIZE
+
+    if settings["window size"] in WINDOW_SIZES:
+        return settings["window size"]
+    
     desktop_height = pygame.display.get_desktop_sizes()[0][1]
     chosen = "small"
     for name in ("small", "medium", "large"):
@@ -48,10 +81,9 @@ def s(value):
     return round(value * UI_SCALE)
 
 # =======================================================
-# 1.3 - Paths                                           #
+# 1.4 - Paths                                           #
 # =======================================================
 
-BASE_DIR = Path(__file__).parent
 FONT_PATH = str(BASE_DIR / "assets" / "font" / "ShortStack.ttf")
 DIGIT_FONT_PATH = str(BASE_DIR / "assets" / "font" / "SometypeMono.ttf")
 
@@ -65,7 +97,7 @@ TOKENS_EMPTY_DIR = BASE_DIR / "assets" / "img" / "tokens" / "empty"
 SETTINGS_ICONS_DIR = BASE_DIR / "assets" / "img" / "settings"
 
 # =======================================================
-# 1.4 - Sizing                                          #
+# 1.5 - Sizing                                          #
 # =======================================================
 
 WARNING_MODAL_SIZE = (s(300), s(180))
@@ -92,7 +124,7 @@ BAR_ICON_SIZE = s(26)
 SETTINGS_PANEL_HEIGHT = s(200)
 
 # =======================================================
-# 1.5 - Layout (positions)                              #
+# 1.6 - Layout (positions)                              #
 # =======================================================
 
 # Menu screen
@@ -154,7 +186,7 @@ WARNING_YES_OFFSET = s(90)
 WARNING_NO_OFFSET = s(130)
 
 # =======================================================
-# 1.6 - Wobble effect                                   #
+# 1.7 - Wobble effect                                   #
 # =======================================================
 
 WOBBLE_INTERVAL = 300           # milliseconds per pose
@@ -173,7 +205,7 @@ BOX_SCALE = 3                   # how much bigger boxes are drawn before smoothi
 RANGE_BAR_WOBBLE = 0.6 * UI_SCALE   # the thin range bar boils more gently
 
 # =======================================================
-# 1.7 - Input cursor                                    #
+# 1.8 - Input cursor                                    #
 # =======================================================
 
 CURSOR_SYMBOL = "_"

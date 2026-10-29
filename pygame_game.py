@@ -25,8 +25,14 @@ from backgrounds import make_background
 # 1.2 - Colors                                          #
 # =======================================================
 
-theme = "plain"
-mode = "dark"           # "dark" or "light"
+# Fall back to the defaults if the saved file names a theme or mode that doesn't exist
+if settings["theme"] not in THEMES:
+    settings["theme"] = "plain"
+if settings["mode"] not in ("dark", "light"):
+    settings["mode"] = "dark"
+
+theme = settings["theme"]
+mode = settings["mode"]
 
 def set_palette(theme, mode):
     global palette, BG_COLOR, TEXT_COLOR, ACCENT_COLOR, FIELD_COLOR, MUTED_COLOR
@@ -605,6 +611,13 @@ def setting_value(name):
         return mode
 
 def change_setting(name, step):
+    # Go to the next (step 1) or previous (step -1) choice, wrapping around, and save it
+    choices = setting_choices(name)
+    index = (choices.index(settings[name]) + step) % len(choices)
+    settings[name] = choices[index]
+    save_settings(settings)
+
+    apply_theme(settings["theme"], settings["mode"])
     # Go to the next (step 1) or previous (step -1) choice, wrapping around
     choices = setting_choices(name)
     index = (choices.index(setting_value(name)) + step) % len(choices)
