@@ -23,6 +23,11 @@ DEFAULT_SETTINGS = {
     "theme": "plain",
     "mode": "dark",
     "window size": "auto",
+
+    "free from": 1,
+    "free to": 100,
+    "free range bar": True,
+    "free history": True,
 }
 
 def load_settings():

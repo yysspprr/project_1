@@ -17,11 +17,11 @@ import sys
 import pygame
 
 # My files
-import _01_game_logic as logic
-from _02_drawing import *
-from _03_themes import THEMES
-from _04_backgrounds import make_background
-from _05_config import *
+import game.game_logic as logic
+from game.drawing import *
+from game.themes import THEMES
+from game.backgrounds import make_background
+from game.config import *
 
 # =======================================================
 # 1.2 - Colors                                          #
@@ -65,7 +65,7 @@ clock = pygame.time.Clock()
 ### =====================================================
 
 # =======================================================
-# 2.1 - Drawing functions                               #
+# 2.1 - Buttons and icons                               #
 # =======================================================
 
 def make_button(text):
@@ -126,12 +126,21 @@ def start_game(difficulty):
     game.difficulty = difficulty
     game.screen = "game"
 
-    game.range_lowest, game.range_highest, game.max_tries, game.tokens_needed = logic.difficulty_settings(difficulty)
+    if difficulty == "free":
+        game.range_lowest = settings["free from"]
+        game.range_highest = settings["free to"]
+        game.max_tries = None                       # None: no limit
+        game.tokens_needed = 0
+        game.history_size = logic.FREE_HISTORY_SIZE
+    else:
+        game.range_lowest, game.range_highest, game.max_tries, game.tokens_needed = logic.difficulty_settings(difficulty)
+        game.history_size = game.max_tries
+
     game.max_digits = logic.max_digits(game.range_lowest, game.range_highest)
     set_game_labels()
 
     make_entry_box(game.max_digits)
-    make_history_box(game.max_tries, game.max_digits)
+    make_history_box(game.history_size, game.max_digits)
 
     game.lives = logic.STARTING_LIVES
     game.tokens = 0
@@ -163,6 +172,12 @@ def end_round(won_round):
     game.round_over = True
     game.rounds_played += 1
     make_range_fill()
+
+    # Free mode: no lives or tokens to update; the win screen comes in F4
+    if game.difficulty == "free":
+        set_game_message(f"got it in {game.try_count} tries!")
+        return
+    
     game.lives, game.tokens = logic.after_round(game.lives, game.tokens, won_round, game.difficulty)
     set_hearts()
     set_tokens()
@@ -184,10 +199,17 @@ def set_typed(text):
 def set_tries_label():
     tries_left = game.max_tries - game.try_count
 
-    if tries_left == 1:
-        text = "1 try left"
+    if game.max_tries is None:
+        if game.try_count == 1:
+            text = "1 try"
+        else:
+            text = f"{game.try_count} tries"
     else:
-        text = f"{tries_left} tries left"
+        tries_left = game.max_tries - game.try_count
+        if tries_left == 1:
+            text = "1 try left"
+        else:
+            text = f"{tries_left} tries left"
 
     labels["tries"] = make_label(text, tiny_font, MUTED_COLOR, "subtle", tiny_digit_font)
 
@@ -228,10 +250,11 @@ def set_history():
     sprites["history"] = make_sprite(slots, "typed")
 
 def make_history_images():
+    shown = game.guesses[-game.history_size:]      # the last history_size guesses
     images = []
-    for position in range(game.max_tries):
-        if position < len(game.guesses):
-            text = str(game.guesses[position]).center(game.max_digits)
+    for position in range(game.history_size):
+        if position < len(shown):
+            text = str(shown[position]).center(game.max_digits)
             color = TEXT_COLOR
         else:
             text = HISTORY_EMPTY_SYMBOL * game.max_digits
@@ -483,6 +506,8 @@ class GameState:
         self.range_lowest, self.range_highest, self.max_tries, self.tokens_needed = logic.difficulty_settings(self.difficulty)
         self.max_digits = logic.max_digits(self.range_lowest, self.range_highest)
 
+        self.history_size = self.max_tries         # how many guesses the history shows
+
         # Game
         self.lives = logic.STARTING_LIVES
         self.tokens = 0
@@ -497,11 +522,18 @@ class GameState:
         self.message = ""
 
     def result(self):
+        # Free mode has no lives or tokens: the game is won once the number is guessed
+        if self.difficulty == "free":
+            if self.round_over:
+                return "game won"
+            return "playing"
         return logic.game_result(self.lives, self.tokens, self.tokens_needed)
 
     def has_progress(self):
+        if self.difficulty == "free":
+            return self.try_count > 0 and not self.round_over
         return logic.has_progress(self.lives, self.tokens, self.tokens_needed, self.rounds_played, self.try_count)
-
+    
     def narrowed_range(self):
         if self.round_over:
             return self.secret, self.secret
@@ -722,7 +754,7 @@ def click_menu(pos):
     if new_game_button["rect"].collidepoint(pos):
         game.screen = "difficulty"
     elif free_mode_button["rect"].collidepoint(pos):
-        print("free mode clicked")
+        start_game("free")
     elif exit_button["rect"].collidepoint(pos):
         game.running = False
 
@@ -893,9 +925,11 @@ def draw_game():
     draw_label(labels["range"], CENTER_X, RANGE_Y)
     draw_label(labels["difficulty"], CENTER_X, DIFFICULTY_LABEL_Y)
     draw_label(labels["round"], CENTER_X, ROUND_Y)
-    draw_label(sprites["hearts"], CENTER_X, HEARTS_Y)
-    draw_stacked(sprites["tokens"]["letters"], sprites["tokens"]["poses"], CENTER_X, TOKENS_Y,
-                 TOKEN_GAP, TOKEN_ROW_GAP)
+
+    if game.difficulty != "free":
+        draw_label(sprites["hearts"], CENTER_X, HEARTS_Y)
+        draw_stacked(sprites["tokens"]["letters"], sprites["tokens"]["poses"], CENTER_X, TOKENS_Y,
+                     TOKEN_GAP, TOKEN_ROW_GAP)
 
     # Play: range bar, message, entry box, space key
     if game.difficulty in RANGE_BAR_MODES:

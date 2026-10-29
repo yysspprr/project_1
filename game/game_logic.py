@@ -1,4 +1,7 @@
 STARTING_LIVES = 3
+FREE_LOWEST = -9999             # the widest range free mode allows
+FREE_HIGHEST = 9999
+FREE_HISTORY_SIZE = 10          # free mode shows the last this-many guesses
 
 def check_guess(guess, secret, range_lowest, range_highest, guesses):
     try:
