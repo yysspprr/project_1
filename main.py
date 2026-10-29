@@ -179,7 +179,7 @@ def end_round(won_round):
     game.rounds_played += 1
     make_range_fill()
 
-    # Free mode: no lives or tokens to update; the win screen comes in F4
+    # Free mode: no lives or tokens to update
     if game.difficulty == "free":
         set_game_message(f"got it in {tries_text(game.try_count)}!")
         return
@@ -213,6 +213,12 @@ def tries_text(count):
 def set_tries_label():
     if game.max_tries is None:
         text = tries_text(game.try_count)
+    else:
+        tries_left = game.max_tries - game.try_count
+        if tries_left == 1:
+            text = "1 try left"
+        else:
+            text = f"{tries_left} tries left"
 
     labels["tries"] = make_label(text, tiny_font, MUTED_COLOR, "subtle", tiny_digit_font)
 
