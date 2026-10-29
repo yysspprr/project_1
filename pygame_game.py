@@ -152,8 +152,15 @@ def make_label(text, font, color, x, y, style="subtle"):
     letters = make_letters(text, font, color)
     return {"letters": letters, "poses": make_poses(letters, style), "x": x, "y": y, "style": style}
 
-def draw_button(button, y, center_x=CENTER_X, in_modal=False):
-    can_hover = game.warning_modal_open == False or in_modal == True
+def draw_button(button, y, center_x=CENTER_X, layer="screen"):
+    # Only buttons on the top layer react to the mouse: modal, then panel, then screen
+    if game.warning_modal_open == True:
+        can_hover = layer == "modal"
+    elif game.settings_open == True:
+        can_hover = layer == "panel"
+    else:
+        can_hover = layer == "screen"
+
     if can_hover == True and button["rect"].collidepoint(pygame.mouse.get_pos()):
         letters = button["hover_letters"]
     else:
@@ -161,7 +168,7 @@ def draw_button(button, y, center_x=CENTER_X, in_modal=False):
     button["rect"] = draw_wobbly(letters, button["poses"], center_x, y)
 
 def make_icon_button(name):
-    frames = load_frames(SETTINGS_ICONS_DIR / name, name, (BAR_ICON_SIZE, BAR_ICON_SIZE))
+    frames = load_frames(SETTINGS_PANEL_ICONS_DIR / name, name, (BAR_ICON_SIZE, BAR_ICON_SIZE))
     normal_frames = []
     hover_frames = []
     for frame in frames:
@@ -177,7 +184,7 @@ def make_icon_button(name):
     }
 
 def draw_icon_button(icon, center_x, y):
-    can_hover = game.warning_modal_open == False
+    can_hover = game.warning_modal_open == False and (game.settings_open == False or icon is settings_icon)
     if can_hover == True and icon["rect"].collidepoint(pygame.mouse.get_pos()):
         image = icon["hover_frames"][icon["frame"]]
     else:
@@ -249,17 +256,9 @@ def tint_frames(frames, color):
         tinted.append(tint_image(frame, color))
     return tinted
 
-def load_heart_frames(state):
-    frames = []
-    for number in range(1, 4):
-        path = str(HEARTS_DIR / state / f"heart_{state}_{number}.png")
-        image = pygame.image.load(path).convert_alpha()
-        frames.append(pygame.transform.smoothscale(image, (HEART_SIZE, HEART_SIZE)))
-    return frames
-
 def load_frames(folder, name, size):
     frames = []
-    for number in range(1, 4):
+    for number in range(1, FRAME_COUNT + 1):
         path = str(folder / f"{name}_{number}.png")
         image = pygame.image.load(path).convert_alpha()
         frames.append(pygame.transform.smoothscale(image, size))
@@ -324,8 +323,6 @@ def end_round(won_round):
         set_game_message("you won the game!")
     elif result == "game_lost":
         set_game_message(f"game over! it was {game.secret}")
-
-    print(f"lives: {game.lives}, tokens: {game.tokens}/{game.tokens_needed}")
 
 def set_game_message(text):
     game.message = text
@@ -706,7 +703,6 @@ class GameState:
 # =======================================================
 
 title_font = pygame.font.Font(FONT_PATH, s(40))
-# heading_font = pygame.font.Font(FONT_PATH, s(30))      # unused for now
 small_heading_font = pygame.font.Font(FONT_PATH, s(26))
 small_heading_digit_font = pygame.font.Font(DIGIT_FONT_PATH, s(24))
 menu_font = pygame.font.Font(FONT_PATH, s(24))
@@ -744,9 +740,9 @@ game = GameState()
 # 3.5 - Game screen setup                               #
 # =======================================================
 
-heart_frames_red = load_heart_frames("red")
-heart_frames_gold = load_heart_frames("gold")
-heart_frames_empty = load_heart_frames("empty")
+heart_frames_red = load_frames(HEARTS_DIR / "red", "heart_red", HEART_SIZE)
+heart_frames_gold = load_frames(HEARTS_DIR / "gold", "heart_gold", HEART_SIZE)
+heart_frames_empty = load_frames(HEARTS_DIR / "empty", "heart_empty", HEART_SIZE)
 
 token_frames_filled_white = load_frames(TOKENS_FILLED_DIR, "token_filled", TOKEN_SIZE)
 token_frames_empty_white = load_frames(TOKENS_EMPTY_DIR, "token_empty", TOKEN_SIZE)
@@ -789,8 +785,6 @@ warning_modal_overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
 warning_modal_panel = pygame.Rect((0, 0), WARNING_MODAL_SIZE)
 warning_modal_panel.center = (CENTER_X, HEIGHT // 2)
 warning_modal_base_points = rounded_box_points(warning_modal_panel, radius=s(16), edge_steps=16)
-warning_modal_image = make_box_image(jitter_points(warning_modal_base_points), warning_modal_panel,
-                                        FIELD_COLOR, TEXT_COLOR)
 
 # Filled in by open_warning_modal
 warning_modal_letters = []
@@ -990,7 +984,7 @@ while running:
 
         # Bottom bar icons
         for icon in all_icons:
-            icon["frame"] = random.randrange(3)
+            icon["frame"] = random.randrange(FRAME_COUNT)
             icon["poses"] = make_poses([icon["frames"][0]], "subtle")
 
         # Menu
@@ -1098,7 +1092,8 @@ while running:
 
         screen.blit(entry_image, entry_image.get_rect(center=entry_box.center))
 
-        can_type = game.round_over == False and game.warning_modal_open == False and len(game.typed_guess) < game.max_digits
+        can_type = (game.round_over == False and game.warning_modal_open == False
+                    and game.settings_open == False and len(game.typed_guess) < game.max_digits)
 
         line_letters = typed_letters
         line_poses = typed_poses
@@ -1156,8 +1151,8 @@ while running:
 
             draw_wobbly(row["label"]["letters"], row["label"]["poses"], SETTINGS_LABEL_X, y, align="left")
             draw_wobbly(row["value"]["letters"], row["value"]["poses"], SETTINGS_VALUE_X, y)
-            draw_button(row["left"], y + arrow_shift, center_x=SETTINGS_VALUE_X - SETTINGS_ARROW_GAP)
-            draw_button(row["right"], y + arrow_shift, center_x=SETTINGS_VALUE_X + SETTINGS_ARROW_GAP)
+            draw_button(row["left"], y + arrow_shift, center_x=SETTINGS_VALUE_X - SETTINGS_ARROW_GAP, layer="panel")
+            draw_button(row["right"], y + arrow_shift, center_x=SETTINGS_VALUE_X + SETTINGS_ARROW_GAP, layer="panel")
 
     x = BAR_PADDING + BAR_ICON_SIZE // 2
     for icon in bar_icons():
@@ -1173,8 +1168,8 @@ while running:
 
         draw_wobbly(warning_modal_letters, warning_modal_poses, CENTER_X, warning_modal_panel.top + WARNING_QUESTION_OFFSET)
 
-        draw_button(warning_modal_yes_button, warning_modal_panel.top + WARNING_YES_OFFSET, in_modal=True)
-        draw_button(warning_modal_no_button, warning_modal_panel.top + WARNING_NO_OFFSET, in_modal=True)
+        draw_button(warning_modal_yes_button, warning_modal_panel.top + WARNING_YES_OFFSET, layer="modal")
+        draw_button(warning_modal_no_button, warning_modal_panel.top + WARNING_NO_OFFSET, layer="modal")
 
     pygame.display.flip()
     dt = clock.tick(FPS)            # milliseconds since the last frame

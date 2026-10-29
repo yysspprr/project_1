@@ -1,5 +1,4 @@
 STARTING_LIVES = 3
-WINNING_LIVES = 6
 
 def check_guess(guess, secret, range_lowest, range_highest, guessed_list):
     try:
@@ -20,19 +19,6 @@ def check_guess(guess, secret, range_lowest, range_highest, guessed_list):
         return "too low"
     else:
         return "correct"
-
-def lives_after_round(lives, won_round, difficulty):
-    if won_round == True:
-        return lives + 1
-    elif difficulty == "hard" and lives > STARTING_LIVES:
-        return STARTING_LIVES
-    else:
-        return lives - 1
-
-def heart_counts(lives):
-    normal_hearts = min(lives, STARTING_LIVES)
-    golden_hearts = max(lives - STARTING_LIVES, 0)
-    return normal_hearts, golden_hearts
 
 def game_result(lives, tokens, tokens_needed):
     if lives == 0:

@@ -51,6 +51,7 @@ WINDOW_SIZES = {
     "medium": (440, 660),
     "large": (520, 780),
 }
+
 BASE_WIDTH = 440                # the layout is designed at the medium size
 FORCE_WINDOW_SIZE = None        # set to "small", "medium" or "large" to test a size
 SCREEN_MARGIN = 120             # room for the taskbar and the window's title bar
@@ -94,7 +95,7 @@ HEARTS_DIR = BASE_DIR / "assets" / "img" / "hearts"
 TOKENS_FILLED_DIR = BASE_DIR / "assets" / "img" / "tokens" / "filled"
 TOKENS_EMPTY_DIR = BASE_DIR / "assets" / "img" / "tokens" / "empty"
 
-SETTINGS_ICONS_DIR = BASE_DIR / "assets" / "img" / "settings"
+SETTINGS_PANEL_ICONS_DIR = BASE_DIR / "assets" / "img" / "settings_panel"
 
 # =======================================================
 # 1.5 - Sizing                                          #
@@ -102,7 +103,7 @@ SETTINGS_ICONS_DIR = BASE_DIR / "assets" / "img" / "settings"
 
 WARNING_MODAL_SIZE = (s(300), s(180))
 SPACE_BAR_KEY_SIZE = (s(50), s(20))
-HEART_SIZE = s(26)
+HEART_SIZE = (s(26), s(26))
 TOKEN_SIZE = (s(30), s(30))
 
 # Range bar
@@ -190,6 +191,7 @@ WARNING_NO_OFFSET = s(130)
 # =======================================================
 
 WOBBLE_INTERVAL = 300           # milliseconds per pose
+FRAME_COUNT = 3                 # how many drawn frames each animated image has
 
 # Wobble styles: (max pixels a letter can move, max degrees it can tilt)
 WOBBLE_STYLES = {
