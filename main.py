@@ -132,9 +132,13 @@ def start_game(difficulty):
         game.max_tries = None                       # None: no limit
         game.tokens_needed = 0
         game.history_size = logic.FREE_HISTORY_SIZE
+        game.show_range_bar = settings["free range bar"]
+        game.show_history = settings["free history"]
     else:
         game.range_lowest, game.range_highest, game.max_tries, game.tokens_needed = logic.difficulty_settings(difficulty)
         game.history_size = game.max_tries
+        game.show_range_bar = difficulty in RANGE_BAR_MODES
+        game.show_history = True
 
     game.max_digits = logic.max_digits(game.range_lowest, game.range_highest)
     set_game_labels()
@@ -145,6 +149,8 @@ def start_game(difficulty):
     game.lives = logic.STARTING_LIVES
     game.tokens = 0
     game.rounds_played = 0
+    game.rounds_won = 0
+    game.total_tries = 0
     set_hearts()
     set_tokens()
     next_round()
@@ -175,8 +181,11 @@ def end_round(won_round):
 
     # Free mode: no lives or tokens to update; the win screen comes in F4
     if game.difficulty == "free":
-        set_game_message(f"got it in {game.try_count} tries!")
+        set_game_message(f"got it in {tries_text(game.try_count)}!")
         return
+
+    if won_round:
+        game.rounds_won += 1
     
     game.lives, game.tokens = logic.after_round(game.lives, game.tokens, won_round, game.difficulty)
     set_hearts()
@@ -196,18 +205,14 @@ def set_typed(text):
     game.typed_guess = text
     labels["typed"] = make_label(text, typed_font, ACCENT_COLOR, "typed")
 
+def tries_text(count):
+    if count == 1:
+        return "1 try"
+    return f"{count} tries"
+
 def set_tries_label():
     if game.max_tries is None:
-        if game.try_count == 1:
-            text = "1 try"
-        else:
-            text = f"{game.try_count} tries"
-    else:
-        tries_left = game.max_tries - game.try_count
-        if tries_left == 1:
-            text = "1 try left"
-        else:
-            text = f"{tries_left} tries left"
+        text = tries_text(game.try_count)
 
     labels["tries"] = make_label(text, tiny_font, MUTED_COLOR, "subtle", tiny_digit_font)
 
@@ -406,7 +411,7 @@ def apply_theme():
     cursor_off = pygame.Surface(cursor_on.get_size(), pygame.SRCALPHA)
     sprites["cursor"] = make_sprite([[cursor_on]], "typed")
     labels["continue"] = make_label("next round", tiny_font, MUTED_COLOR)
-    labels["play_again"] = make_label("play again", tiny_font, MUTED_COLOR)
+    labels["play_again"] = make_label("see results", tiny_font, MUTED_COLOR)
 
     # See-through layers
     bar_surface.fill(BAR_COLOR)
@@ -434,6 +439,7 @@ def apply_theme():
     set_hearts()
     set_tokens()
     set_history()
+    set_results()
     set_settings_rows()
 
 # =======================================================
@@ -586,7 +592,55 @@ def start_free_game():
     start_game("free")
 
 # =======================================================
-# 2.5 - Game state class                                #
+# 2.5 - Results screen functions                        #
+# =======================================================
+
+def open_results():
+    game.screen = "results"
+    set_results()
+
+def set_results():
+    # The title and stats lines, depending on the mode and how the game ended
+    global results_lines
+    lines = []
+
+    if game.difficulty == "free":
+        title = "you got it!"
+        lines.append(f"the number was {game.secret}")
+        lines.append(f"free mode ({game.range_lowest} to {game.range_highest})")
+        lines.append(tries_text(game.try_count))
+
+        # Only mention the help that was turned off
+        turned_off = []
+        if not game.show_range_bar:
+            turned_off.append("no range bar")
+        if not game.show_history:
+            turned_off.append("no history")
+        if len(turned_off) > 0:
+            lines.append(", ".join(turned_off))
+    else:
+        if game.result() == "game won":
+            title = "you won!"
+        else:
+            title = "game over"
+            lines.append(f"the last number was {game.secret}")
+        lines.append(f"{game.difficulty} mode")
+        lines.append(f"{game.rounds_won} of {game.rounds_played} rounds won")
+        lines.append(f"{game.total_tries} guesses in total")
+
+    labels["results_title"] = make_label(title, title_font, TEXT_COLOR, "strong")
+    results_lines = []
+    for text in lines:
+        results_lines.append(make_label(text, small_font, TEXT_COLOR, "normal", small_digit_font))
+
+def results_back_button():
+    # "change range" after free mode, "difficulty" after the regular modes
+    if game.difficulty == "free":
+        return results_range_button
+    return results_difficulty_button
+
+# =======================================================
+# 2.6 - Game state class                                #
 # =======================================================
 
 class GameState:
@@ -607,6 +661,9 @@ class GameState:
 
         self.history_size = self.max_tries         # how many guesses the history shows
 
+        self.show_range_bar = True
+        self.show_history = True
+
         # Free mode setup screen
         self.free_text = {"from": "", "to": ""}     # what's typed in each box
         self.free_focus = "from"                    # which box you're typing in
@@ -616,6 +673,8 @@ class GameState:
         self.lives = logic.STARTING_LIVES
         self.tokens = 0
         self.rounds_played = 0
+        self.rounds_won = 0
+        self.total_tries = 0            # guesses over the whole game, all rounds together
 
         # Current round
         self.secret = 0
@@ -692,6 +751,12 @@ FREE_TOGGLES = [
     ("free history", "history"),
 ]
 
+# Results screen
+results_again_button = make_button("play again")
+results_range_button = make_button("change range")
+results_difficulty_button = make_button("difficulty")
+results_menu_button = make_button("menu")
+
 # =======================================================
 # 3.4 - Game state                                      #
 # =======================================================
@@ -754,6 +819,7 @@ all_buttons = [
     easy_button, normal_button, hard_button,
     free_start_button,
     warning_modal_yes_button, warning_modal_no_button,
+    results_again_button, results_range_button, results_difficulty_button, results_menu_button,
 ]
 
 # =======================================================
@@ -812,6 +878,8 @@ def handle_click(pos):
         click_difficulty(pos)
     elif game.screen == "free setup":
         click_free_setup(pos)
+    elif game.screen == "results":
+        click_results(pos)
 
 def click_warning_modal(pos):
     if warning_modal_yes_button["rect"].collidepoint(pos):
@@ -903,6 +971,14 @@ def click_free_setup(pos):
                 toggle_free_option(row["name"])
                 break
 
+def click_results(pos):
+    if results_again_button["rect"].collidepoint(pos):
+        start_game(game.difficulty)
+    elif results_back_button()["rect"].collidepoint(pos):
+        leave_game()
+    elif results_menu_button["rect"].collidepoint(pos):
+        game.screen = "menu"
+
 # --- Keyboard ---
 
 def handle_key(event):
@@ -923,10 +999,15 @@ def handle_key(event):
             handle_typing(event)
     elif game.screen == "free setup" and not game.settings_open:
         type_in_free_box(event)
+    elif game.screen == "results" and not game.settings_open:
+        if event.key == pygame.K_SPACE:
+            start_game(game.difficulty)
 
 def handle_typing(event):
     if event.unicode.isdigit() and len(game.typed_guess) < game.max_digits:
         set_typed(game.typed_guess + event.unicode)
+    elif event.unicode == "-" and game.typed_guess == "" and game.range_lowest < 0:
+        set_typed("-")                          # a minus only first, and only if the range goes below 0
     elif event.key == pygame.K_BACKSPACE:
         set_typed(game.typed_guess[:-1])
     elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
@@ -951,6 +1032,7 @@ def submit_guess():
     if result in ("too high", "too low", "correct"):
         game.guesses.append(int(guess))
         game.try_count += 1
+        game.total_tries += 1
         set_tries_label()
         set_history()
         make_range_fill()
@@ -966,7 +1048,7 @@ def continue_after_round():
     if game.result() == "playing":
         next_round()
     else:
-        start_game(game.difficulty)
+        open_results()
 
 # =======================================================
 # 4.2 - Update                                          #
@@ -1021,6 +1103,9 @@ def wobble_everything():
         rewobble(row["label"])
         rewobble(row["value"])
 
+    for label in results_lines:
+        rewobble(label)
+
     if background is not None:
         background.wobble()
 
@@ -1043,6 +1128,8 @@ def draw_screen():
         draw_free_setup()
     elif game.screen == "game":
         draw_game()
+    elif game.screen == "results":
+        draw_results()
 
     draw_bar()
     draw_settings_panel()
@@ -1097,31 +1184,41 @@ def draw_free_setup():
 
     draw_button(free_start_button, FREE_START_Y)
 
+def draw_results():
+    draw_label(labels["results_title"], CENTER_X, RESULTS_TITLE_Y)
+    for position in range(len(results_lines)):
+        draw_label(results_lines[position], CENTER_X, RESULTS_LINES_Y + position * RESULTS_LINE_GAP)
+
+    draw_button(results_again_button, RESULTS_AGAIN_Y)
+    draw_button(results_back_button(), RESULTS_BACK_Y)
+    draw_button(results_menu_button, RESULTS_MENU_Y)
+
 def draw_game():
     # Status: what you're guessing, and how you're doing
     draw_label(labels["heading"], CENTER_X, HEADING_Y)
     draw_label(labels["range"], CENTER_X, RANGE_Y)
     draw_label(labels["difficulty"], CENTER_X, DIFFICULTY_LABEL_Y)
-    draw_label(labels["round"], CENTER_X, ROUND_Y)
 
     if game.difficulty != "free":
+        draw_label(labels["round"], CENTER_X, ROUND_Y)
         draw_label(sprites["hearts"], CENTER_X, HEARTS_Y)
         draw_stacked(sprites["tokens"]["letters"], sprites["tokens"]["poses"], CENTER_X, TOKENS_Y,
                      TOKEN_GAP, TOKEN_ROW_GAP)
 
     # Play: range bar, message, entry box, space key
-    if game.difficulty in RANGE_BAR_MODES:
+    if game.show_range_bar:
         draw_range_bar()
     draw_label(labels["message"], CENTER_X, MESSAGE_Y)
     draw_entry()
     if game.round_over:
         draw_space_cue()
 
-    # Record: tries left and the guess history
+    # Record: tries and the guess history
     draw_label(labels["tries"], CENTER_X, TRIES_Y)
-    draw_box(boxes["history"])
-    draw_stacked(sprites["history"]["letters"], sprites["history"]["poses"], CENTER_X, HISTORY_Y,
-                 HISTORY_GAP, HISTORY_ROW_GAP)
+    if game.show_history:
+        draw_box(boxes["history"])
+        draw_stacked(sprites["history"]["letters"], sprites["history"]["poses"], CENTER_X, HISTORY_Y,
+                     HISTORY_GAP, HISTORY_ROW_GAP)
 
 # --- Parts of the game screen ---
 

@@ -186,6 +186,14 @@ HISTORY_Y = s(510)                      # top of the guess history
 HISTORY_GAP = s(12)                     # space between slots in a row
 HISTORY_ROW_GAP = s(6)                  # space between the two rows
 
+# Results screen
+RESULTS_TITLE_Y = s(70)
+RESULTS_LINES_Y = s(150)                # top of the first stats line
+RESULTS_LINE_GAP = s(32)                # from one stats line to the next
+RESULTS_AGAIN_Y = s(370)
+RESULTS_BACK_Y = s(425)
+RESULTS_MENU_Y = s(480)
+
 # Bottom bar
 BAR_PADDING = s(16)                     # space between the window edge and the outer icons
 BAR_ICON_GAP = s(12)                    # space between icons
