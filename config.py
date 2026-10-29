@@ -139,6 +139,9 @@ HISTORY_ROW_GAP = s(6)                  # space between the two rows
 BAR_PADDING = s(16)                     # space between the window edge and the outer icons
 BAR_ICON_GAP = s(12)                    # space between icons
 
+SETTINGS_PANEL_HEIGHT = s(200)
+SETTINGS_PANEL_MARGIN = s(12)           # space around the panel: window sides and above the bar
+
 # Warning modal offsets (measured down from the panel's top edge)
 WARNING_QUESTION_OFFSET = s(30)
 WARNING_YES_OFFSET = s(90)

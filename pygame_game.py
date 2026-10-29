@@ -509,6 +509,11 @@ def clicked_bar_icon(pos):
             return icon
     return None
 
+def make_settings_panel():
+    global settings_panel_image
+    settings_panel_image = make_box_image(jitter_points(settings_panel_points), settings_panel,
+                                          FIELD_COLOR, TEXT_COLOR)
+
 def apply_theme(new_theme, new_mode):
     # Switch to a theme and remake everything that has a color
     global theme, mode, background
@@ -579,6 +584,9 @@ def apply_theme(new_theme, new_mode):
     set_tokens()
     set_history()
 
+    # Settings panel
+    make_settings_panel()
+
 # =======================================================
 # 2.3 - Game state class                                #
 # =======================================================
@@ -590,6 +598,7 @@ class GameState:
         self.screen = "menu"
         self.warning_modal_open = False
         self.warning_modal_action = ""
+        self.settings_open = False
 
         # Difficulty
         self.difficulty = "normal"
@@ -700,7 +709,16 @@ all_icons = [home_icon, back_icon, restart_icon, settings_icon]
 bar_surface = pygame.Surface((WIDTH, BAR_HEIGHT), pygame.SRCALPHA)
 
 # =======================================================
-# 3.7 - Warning modal setup                             #
+# 3.7 - Settings panel setup                            #
+# =======================================================
+
+settings_panel = pygame.Rect(0, 0, WIDTH - SETTINGS_PANEL_MARGIN * 2, SETTINGS_PANEL_HEIGHT)
+settings_panel.bottom = HEIGHT - BAR_HEIGHT - SETTINGS_PANEL_MARGIN
+settings_panel.centerx = CENTER_X
+settings_panel_points = rounded_box_points(settings_panel, radius=s(16), edge_steps=16)
+
+# =======================================================
+# 3.8 - Warning modal setup                             #
 # =======================================================
 
 warning_modal_overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -779,7 +797,10 @@ while running:
                     game.warning_modal_open = False
 
             elif clicked_icon is settings_icon:
-                print("settings clicked")              # the panel comes later
+                game.settings_open = not game.settings_open
+            elif game.settings_open == True:
+                if not settings_panel.collidepoint(event.pos):
+                    game.settings_open = False         # a click outside the panel closes it
             elif clicked_icon is home_icon:
                 if game.has_progress() == True:
                     open_warning_modal("menu", "leave this game?")
@@ -867,6 +888,10 @@ while running:
             next_index = (theme_names.index(theme) + 1) % len(theme_names)
             apply_theme(theme_names[next_index], mode)
 
+        # Esc opens and closes the settings panel
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and game.warning_modal_open == False:
+            game.settings_open = not game.settings_open
+
     # ===================================================
     # 4.3 - Update                                      #
     # ===================================================
@@ -939,6 +964,8 @@ while running:
 
         # Warning modal
         warning_modal_poses = make_poses(warning_modal_letters, "normal")
+
+        make_settings_panel()
 
         # Background
         if background is not None:
@@ -1034,6 +1061,10 @@ while running:
         x += BAR_ICON_SIZE + BAR_ICON_GAP
 
     draw_icon_button(settings_icon, WIDTH - BAR_PADDING - BAR_ICON_SIZE // 2, icon_y)
+
+    # Settings panel, above the bar
+    if game.settings_open == True:
+        screen.blit(settings_panel_image, settings_panel_image.get_rect(center=settings_panel.center))
 
     # Warning modal drawn last so it sits on top of everything
     if game.warning_modal_open == True:
