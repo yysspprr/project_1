@@ -162,6 +162,20 @@ def rewobble(label):
     # New poses in the label's own style; works for buttons too
     label["poses"] = make_poses(label["letters"], label["style"])
 
+def make_sprite(slots, style="subtle"):
+    # Wobbly images: each slot has a few frames to pick from, and a random one shows each tick
+    sprite = {"slots": slots, "style": style}
+    reanimate(sprite)
+    return sprite
+
+def reanimate(sprite):
+    # Pick a new frame for every slot, and new poses
+    images = []
+    for frames in sprite["slots"]:
+        images.append(random.choice(frames))
+    sprite["letters"] = images
+    sprite["poses"] = make_poses(images, sprite["style"])
+
 def draw_button(button, y, center_x=CENTER_X, layer="screen"):
     # Only buttons on the top layer react to the mouse: modal, then panel, then screen
     if game.warning_modal_open == True:
@@ -352,41 +366,36 @@ def set_round_label():
     labels["round"] = make_label(f"round {round_number}", tiny_font, TEXT_COLOR, "subtle", tiny_digit_font)
 
 def set_hearts():
-    global heart_images, heart_poses
-    heart_images = make_heart_images()
-    heart_poses = make_poses(heart_images)
+    sprites["hearts"] = make_sprite(heart_slots(), "strong")
 
-def make_heart_images():
-    images = []
+def heart_slots():
+    slots = []
     for position in range(logic.STARTING_LIVES):
         if game.result() == "game_won":
-            frames = heart_frames_gold
+            slots.append(heart_frames_gold)
         elif position < game.lives:
-            frames = heart_frames_red
+            slots.append(heart_frames_red)
         else:
-            frames = heart_frames_empty
-        images.append(random.choice(frames))
-    return images
+            slots.append(heart_frames_empty)
+    return slots
 
 def set_tokens():
-    global token_images, token_poses
-    token_images = make_token_images()
-    token_poses = make_poses(token_images)
+    sprites["tokens"] = make_sprite(token_slots(), "strong")
 
-def make_token_images():
-    images = []
+def token_slots():
+    slots = []
     for position in range(game.tokens_needed):
         if position < game.tokens:
-            frames = token_frames_filled
+            slots.append(token_frames_filled)
         else:
-            frames = token_frames_empty
-        images.append(random.choice(frames))
-    return images
+            slots.append(token_frames_empty)
+    return slots
 
 def set_history():
-    global history_images, history_poses
-    history_images = make_history_images()
-    history_poses = make_poses(history_images, "typed")
+    slots = []
+    for image in make_history_images():
+        slots.append([image])           # one frame each: the numbers wobble but don't animate
+    sprites["history"] = make_sprite(slots, "typed")
 
 def make_history_images():
     images = []
@@ -521,7 +530,7 @@ def apply_theme(new_theme, new_mode):
     # Switch to a theme and remake everything that has a color
     global theme, mode, background
     global cursor_on, cursor_off, cursor_poses
-    global token_frames_filled, token_frames_empty, enter_frames, space_frames, enter_image, space_image
+    global token_frames_filled, token_frames_empty, enter_image, space_image
     global enter_poses, space_poses
 
     # A new background only when the theme changes, so a mode switch keeps the ripples
@@ -550,15 +559,13 @@ def apply_theme(new_theme, new_mode):
     token_frames_empty = tint_frames(token_frames_empty_white, MUTED_COLOR)
     enter_frames = tint_frames(enter_frames_white, TEXT_COLOR)
     space_frames = tint_frames(space_frames_white, MUTED_COLOR)
-    enter_image = random.choice(enter_frames)
-    space_image = random.choice(space_frames)
-    enter_poses = make_poses([enter_image], "subtle")
-    space_poses = make_poses([space_image], "subtle")
+    sprites["enter"] = make_sprite([enter_frames], "subtle")
+    sprites["space"] = make_sprite([space_frames], "subtle")
 
     # Cursor and small labels
     cursor_on = typed_font.render(CURSOR_SYMBOL, True, MUTED_COLOR)
     cursor_off = pygame.Surface(cursor_on.get_size(), pygame.SRCALPHA)
-    cursor_poses = make_poses([cursor_on], "typed")
+    sprites["cursor"] = make_sprite([[cursor_on]], "typed")
     labels["continue"] = make_label("next round", tiny_font, MUTED_COLOR)
     labels["play_again"] = make_label("play again", tiny_font, MUTED_COLOR)
 
@@ -792,6 +799,7 @@ all_buttons = [
 
 background = None
 labels = {}                     # every wobbly text, by name; filled in by apply_theme and the setters
+sprites = {}                    # every wobbly image, by name
 apply_theme(theme, mode)
 
 ### =====================================================
@@ -971,6 +979,10 @@ while running:
         for label in labels.values():
             rewobble(label)
 
+        # All sprites
+        for sprite in sprites.values():
+            reanimate(sprite)
+
         # Buttons
         for button in all_buttons:
             rewobble(button)
@@ -981,14 +993,6 @@ while running:
             icon["poses"] = make_poses([icon["frames"][0]], "subtle")
 
         # Game screen
-        heart_images = make_heart_images()
-        heart_poses = make_poses(heart_images)
-
-        token_images = make_token_images()
-        token_poses = make_poses(token_images)
-
-        history_poses = make_poses(history_images, "typed")
-
         entry_points = jitter_points(entry_base_points)
         entry_image = make_box_image(entry_points, entry_box, FIELD_COLOR, TEXT_COLOR)
 
@@ -1003,14 +1007,6 @@ while running:
 
         for label in range_labels:
             rewobble(label)
-
-        cursor_poses = make_poses([cursor_on], "typed")
-
-        enter_image = random.choice(enter_frames)
-        enter_poses = make_poses([enter_image], "subtle")
-
-        space_image = random.choice(space_frames)
-        space_poses = make_poses([space_image], "subtle")
 
         # Settings rows
         for row in settings_rows:
@@ -1053,8 +1049,8 @@ while running:
         draw_label(labels["range"], CENTER_X, RANGE_Y)
         draw_label(labels["difficulty"], CENTER_X, DIFFICULTY_LABEL_Y)
         draw_label(labels["round"], CENTER_X, ROUND_Y)
-        draw_wobbly(heart_images, heart_poses, CENTER_X, HEARTS_Y)
-        draw_stacked(token_images, token_poses, CENTER_X, TOKENS_Y, TOKEN_GAP, TOKEN_ROW_GAP)
+        draw_label(sprites["hearts"], CENTER_X, HEARTS_Y)
+        draw_stacked(sprites["tokens"]["letters"], sprites["tokens"]["poses"], CENTER_X, TOKENS_Y, TOKEN_GAP, TOKEN_ROW_GAP)
 
         if game.difficulty in RANGE_BAR_MODES:
             screen.blit(range_fill_image, range_fill_image.get_rect(center=range_fill.center))
@@ -1067,8 +1063,8 @@ while running:
         can_type = (game.round_over == False and game.warning_modal_open == False
                     and game.settings_open == False and len(game.typed_guess) < game.max_digits)
 
-        line_letters = labels["typed"]["letters"]
-        line_poses = labels["typed"]["poses"]
+        line_letters = labels["typed"]["letters"] + [cursor_image]
+        line_poses = labels["typed"]["poses"] + sprites["cursor"]["poses"]
 
         if len(line_letters) > 0:
             draw_wobbly(line_letters, line_poses, entry_box.left + ENTRY_PADDING,
@@ -1077,7 +1073,7 @@ while running:
         if game.typed_guess != "" and game.round_over == False:
             enter_x = entry_box.right - ENTER_KEY_INSET - ENTER_KEY_SIZE[0] // 2
             enter_y = entry_box.centery - ENTER_KEY_SIZE[1] // 2
-            draw_wobbly([enter_image], enter_poses, enter_x, enter_y)
+            draw_label(sprites["enter"], enter_x, enter_y)
 
         if game.round_over == True:
             if game.result() == "playing":
@@ -1086,14 +1082,15 @@ while running:
                 next_label = labels["play_again"]
 
             space_y = entry_box.bottom + SPACE_BAR_KEY_GAP
-            draw_wobbly([space_image], space_poses, CENTER_X, space_y)
+            draw_label(sprites["space"], CENTER_X, space_y)
             draw_label(next_label, CENTER_X, space_y + SPACE_BAR_KEY_SIZE[1] + SPACE_BAR_KEY_LABEL_GAP)
 
         draw_label(labels["message"], CENTER_X, MESSAGE_Y)
 
         draw_label(labels["tries"], CENTER_X, TRIES_Y)
         screen.blit(history_image, history_image.get_rect(center=history_box.center))
-        draw_stacked(history_images, history_poses, CENTER_X, HISTORY_Y, HISTORY_GAP, HISTORY_ROW_GAP)
+        draw_stacked(sprites["history"]["letters"], sprites["history"]["poses"], CENTER_X, HISTORY_Y,
+                     HISTORY_GAP, HISTORY_ROW_GAP)
 
     # Bottom bar, on every screen
     bar_top = HEIGHT - BAR_HEIGHT - settings_offset()
