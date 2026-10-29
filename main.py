@@ -275,9 +275,9 @@ def make_entry_box(max_digits):
     entry_box.center = (CENTER_X, ENTRY_BOX_Y)
     boxes["entry"] = make_box(entry_box, FIELD_COLOR, TEXT_COLOR)
 
-def make_history_box(max_tries, max_digits):
+def make_history_box(history_size, max_digits):
     global history_box
-    columns = max_tries - max_tries // 2            # the bottom row is the widest
+    columns = history_size - history_size // 2      # the bottom row is the widest
     slot_width = history_font.size("0" * max_digits)[0]
     slot_height = history_font.get_height()
 
@@ -365,13 +365,6 @@ def clicked_bar_icon(pos):
     for icon in bar_icons() + [settings_icon]:
         if icon["rect"].collidepoint(pos):
             return icon
-        elif icon is back_icon:
-            if game.screen in ("difficulty", "free setup"):
-                game.screen = "menu"
-            elif game.has_progress():
-                open_warning_modal("back", "leave this game?")
-            else:
-                leave_game()
     return None
 
 def apply_theme():
@@ -426,10 +419,11 @@ def apply_theme():
     labels["free_to_label"] = make_label("to", tiny_font, MUTED_COLOR)
     set_free_inputs()
     set_free_message(game.free_message)
+    set_free_toggles()
 
     # Game screen: boxes and setters, rebuilt from the current game
     make_entry_box(game.max_digits)
-    make_history_box(game.max_tries, game.max_digits)
+    make_history_box(game.history_size, game.max_digits)
     make_range_track()
     make_range_fill()
     set_game_labels()
@@ -530,6 +524,25 @@ def set_free_inputs():
 def set_free_message(text):
     game.free_message = text
     labels["free_message"] = make_label(text, small_font, TEXT_COLOR, "normal", small_digit_font)
+
+def set_free_toggles():
+    global free_toggles
+    free_toggles = []
+    for name, text in FREE_TOGGLES:
+        if settings[name]:
+            value = "on"
+        else:
+            value = "off"
+        free_toggles.append({
+            "name": name,
+            "label": make_label(text, small_font, MUTED_COLOR),
+            "value": make_button(value),
+        })
+
+def toggle_free_option(name):
+    settings[name] = not settings[name]
+    save_settings(settings)
+    set_free_toggles()
 
 def type_in_free_box(event):
     field = game.free_focus
@@ -672,6 +685,12 @@ normal_button = make_button("normal")
 hard_button = make_button("hard")
 
 free_start_button = make_button("start")
+
+# Free mode toggles: (setting name, label shown)
+FREE_TOGGLES = [
+    ("free range bar", "range bar"),
+    ("free history", "history"),
+]
 
 # =======================================================
 # 3.4 - Game state                                      #
@@ -841,12 +860,12 @@ def click_bar_icon(icon):
         else:
             game.screen = "menu"
     elif icon is back_icon:
-        if game.screen == "difficulty":
+        if game.screen in ("difficulty", "free setup"):
             game.screen = "menu"
         elif game.has_progress():
-            open_warning_modal("difficulty", "leave this game?")
+            open_warning_modal("back", "leave this game?")
         else:
-            game.screen = "difficulty"
+            leave_game()
     elif icon is restart_icon:
         if game.has_progress():
             open_warning_modal("restart", "restart this game?")
@@ -878,6 +897,11 @@ def click_free_setup(pos):
         set_free_inputs()
     elif free_start_button["rect"].collidepoint(pos):
         start_free_game()
+    else:
+        for row in free_toggles:
+            if row["value"]["rect"].collidepoint(pos):
+                toggle_free_option(row["name"])
+                break
 
 # --- Keyboard ---
 
@@ -993,6 +1017,10 @@ def wobble_everything():
         rewobble(row["left"])
         rewobble(row["right"])
 
+    for row in free_toggles:
+        rewobble(row["label"])
+        rewobble(row["value"])
+
     if background is not None:
         background.wobble()
 
@@ -1058,6 +1086,15 @@ def draw_free_setup():
                         rect.centery - typed_font.get_height() // 2, align="left")
 
     draw_label(labels["free_message"], CENTER_X, FREE_MESSAGE_Y)
+
+    # The toggles; the values use the bigger menu font, so move them up to line up
+    value_shift = (small_font.get_height() - menu_font.get_height()) // 2
+    for position in range(len(free_toggles)):
+        row = free_toggles[position]
+        y = FREE_TOGGLE_Y + position * FREE_TOGGLE_GAP
+        draw_label(row["label"], FREE_TOGGLE_LABEL_X, y, align="left")
+        draw_button(row["value"], y + value_shift, center_x=FREE_TOGGLE_VALUE_X)
+
     draw_button(free_start_button, FREE_START_Y)
 
 def draw_game():

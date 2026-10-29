@@ -151,6 +151,10 @@ FREE_BOX_CHARS = 6                      # room inside a box: a minus, 4 digits a
 FREE_LABEL_GAP = s(6)                   # space between a box and its label above it
 FREE_MESSAGE_Y = s(230)
 FREE_START_Y = s(420)
+FREE_TOGGLE_Y = s(280)                  # top of the first toggle row
+FREE_TOGGLE_GAP = s(40)                 # from one toggle row to the next
+FREE_TOGGLE_LABEL_X = CENTER_X - s(110) # left edge of the toggle labels
+FREE_TOGGLE_VALUE_X = CENTER_X + s(90)  # center of the on/off values
 
 # Game screen
 HEADING_Y = s(10)
