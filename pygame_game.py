@@ -584,9 +584,51 @@ def apply_theme(new_theme, new_mode):
     set_hearts()
     set_tokens()
     set_history()
+    set_settings_rows()
 
 # =======================================================
-# 2.3 - Game state class                                #
+# 2.3 - Settings functions                              #
+# =======================================================
+
+def setting_choices(name):
+    # Everything a setting can be set to, in order
+    if name == "theme":
+        return list(THEMES)
+    elif name == "mode":
+        return ["dark", "light"]
+
+def setting_value(name):
+    # What a setting is set to right now
+    if name == "theme":
+        return theme
+    elif name == "mode":
+        return mode
+
+def change_setting(name, step):
+    # Go to the next (step 1) or previous (step -1) choice, wrapping around
+    choices = setting_choices(name)
+    index = (choices.index(setting_value(name)) + step) % len(choices)
+    new_value = choices[index]
+
+    if name == "theme":
+        apply_theme(new_value, mode)
+    elif name == "mode":
+        apply_theme(theme, new_value)
+
+def set_settings_rows():
+    global settings_rows
+    settings_rows = []
+    for name in SETTINGS_ROWS:
+        settings_rows.append({
+            "name": name,
+            "label": make_label(name, small_font, MUTED_COLOR, SETTINGS_LABEL_X, 0),
+            "value": make_label(setting_value(name), small_font, TEXT_COLOR, SETTINGS_VALUE_X, 0),
+            "left": make_button("<"),
+            "right": make_button(">"),
+        })
+
+# =======================================================
+# 2.4 - Game state class                                #
 # =======================================================
 
 class GameState:
@@ -710,6 +752,7 @@ bar_surface = pygame.Surface((WIDTH, BAR_HEIGHT), pygame.SRCALPHA)
 # 3.7 - Settings panel setup                            #
 # =======================================================
 
+SETTINGS_ROWS = ["theme", "mode"]           # the window size row comes in S3
 settings_panel_surface = pygame.Surface((WIDTH, SETTINGS_PANEL_HEIGHT), pygame.SRCALPHA)
 settings_slide = 0              # 0 = closed, 1 = fully open; changes a bit every frame
 
@@ -797,6 +840,15 @@ while running:
             elif game.settings_open == True:
                 if event.pos[1] < HEIGHT - BAR_HEIGHT - settings_offset():
                     game.settings_open = False         # a click above the bar closes the panel
+                else:
+                    for row in settings_rows:
+                        if row["left"]["rect"].collidepoint(event.pos):
+                            change_setting(row["name"], -1)
+                            break
+                        elif row["right"]["rect"].collidepoint(event.pos):
+                            change_setting(row["name"], 1)
+                            break
+
             elif clicked_icon is home_icon:
                 if game.has_progress() == True:
                     open_warning_modal("menu", "leave this game?")
@@ -832,7 +884,7 @@ while running:
 
         # Keyboard
         if (event.type == pygame.KEYDOWN and game.screen == "game" and game.round_over == False
-            and game.warning_modal_open == False and game.settings_open == False):
+                and game.warning_modal_open == False and game.settings_open == False):
 
             if event.unicode.isdigit() and len(game.typed_guess) < game.max_digits:
                 set_typed(game.typed_guess + event.unicode)
@@ -877,17 +929,13 @@ while running:
                 start_game(game.difficulty)
 
         # L switches between light and dark mode
+        # L switches between light and dark mode
         if event.type == pygame.KEYDOWN and event.key == pygame.K_l and game.warning_modal_open == False:
-            if mode == "dark":
-                apply_theme(theme, "light")
-            else:
-                apply_theme(theme, "dark")
+            change_setting("mode", 1)
 
         # T goes to the next theme
         if event.type == pygame.KEYDOWN and event.key == pygame.K_t and game.warning_modal_open == False:
-            theme_names = list(THEMES)
-            next_index = (theme_names.index(theme) + 1) % len(theme_names)
-            apply_theme(theme_names[next_index], mode)
+            change_setting("theme", 1)
 
         # Esc opens and closes the settings panel
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and game.warning_modal_open == False:
@@ -972,6 +1020,13 @@ while running:
 
         # Warning modal
         warning_modal_poses = make_poses(warning_modal_letters, "normal")
+
+        # Settings rows
+        for row in settings_rows:
+            row["label"]["poses"] = make_poses(row["label"]["letters"], row["label"]["style"])
+            row["value"]["poses"] = make_poses(row["value"]["letters"], row["value"]["style"])
+            row["left"]["poses"] = make_poses(row["left"]["letters"])
+            row["right"]["poses"] = make_poses(row["right"]["letters"])
 
         # Background
         if background is not None:
@@ -1066,6 +1121,18 @@ while running:
         panel_top = bar_top + BAR_HEIGHT
         pygame.draw.rect(screen, BG_COLOR, (0, panel_top, WIDTH, SETTINGS_PANEL_HEIGHT))
         screen.blit(settings_panel_surface, (0, panel_top))
+
+        # Arrows use the bigger menu font, so move them up to line up with the rows
+        arrow_shift = (small_font.get_height() - menu_font.get_height()) // 2
+
+        for position in range(len(settings_rows)):
+            row = settings_rows[position]
+            y = panel_top + SETTINGS_ROW_TOP + position * SETTINGS_ROW_GAP
+
+            draw_wobbly(row["label"]["letters"], row["label"]["poses"], SETTINGS_LABEL_X, y, align="left")
+            draw_wobbly(row["value"]["letters"], row["value"]["poses"], SETTINGS_VALUE_X, y)
+            draw_button(row["left"], y + arrow_shift, center_x=SETTINGS_VALUE_X - SETTINGS_ARROW_GAP)
+            draw_button(row["right"], y + arrow_shift, center_x=SETTINGS_VALUE_X + SETTINGS_ARROW_GAP)
 
     x = BAR_PADDING + BAR_ICON_SIZE // 2
     for icon in bar_icons():

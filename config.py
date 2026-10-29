@@ -142,6 +142,11 @@ BAR_PADDING = s(16)                     # space between the window edge and the 
 BAR_ICON_GAP = s(12)                    # space between icons
 
 SETTINGS_SLIDE_TIME = 250               # milliseconds for the bar to slide fully open or closed
+SETTINGS_ROW_TOP = s(24)                # from the panel's top edge to the first row
+SETTINGS_ROW_GAP = s(40)                # from one row to the next
+SETTINGS_LABEL_X = s(30)                # left edge of the labels
+SETTINGS_VALUE_X = WIDTH - s(110)       # center of the values
+SETTINGS_ARROW_GAP = s(65)              # from a value's center to each of its arrows
 
 # Warning modal offsets (measured down from the panel's top edge)
 WARNING_QUESTION_OFFSET = s(30)
