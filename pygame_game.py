@@ -269,6 +269,26 @@ def make_box_image(points, rect, fill_color, line_color):
 
     return pygame.transform.smoothscale(big, (width, height))
 
+def make_box(rect, fill_color, line_color, radius=s(14), edge_steps=8, wobble=BOX_WOBBLE):
+    # A boiling box: its shape, colors and how much it wobbles, plus its current image
+    box = {
+        "rect": rect,
+        "points": rounded_box_points(rect, radius=radius, edge_steps=edge_steps),
+        "fill": fill_color,
+        "line": line_color,
+        "wobble": wobble,
+    }
+    rejitter(box)
+    return box
+
+def rejitter(box):
+    # A new wobbly image of the box, in its own colors and wobble amount
+    jittered = jitter_points(box["points"], box["wobble"])
+    box["image"] = make_box_image(jittered, box["rect"], box["fill"], box["line"])
+
+def draw_box(box):
+    screen.blit(box["image"], box["image"].get_rect(center=box["rect"].center))
+
 def tint_image(image, color):
     tinted = image.copy()
     tinted.fill(color, special_flags=pygame.BLEND_RGBA_MULT)
@@ -410,27 +430,22 @@ def make_history_images():
     return images
 
 def open_warning_modal(action, question):
-    global warning_modal_image
-
     game.warning_modal_open = True
     game.warning_modal_action = action
     labels["warning"] = make_label(question, menu_font, TEXT_COLOR, "normal")
-
-    warning_modal_image = make_box_image(jitter_points(warning_modal_base_points), warning_modal_panel,
-                                         FIELD_COLOR, TEXT_COLOR)
+    boxes["warning"] = make_box(warning_modal_panel, FIELD_COLOR, TEXT_COLOR, radius=s(16), edge_steps=16)
 
 def make_entry_box(max_digits):
-    global entry_box, entry_base_points, entry_image
+    global entry_box
     width = (ENTRY_PADDING + max_digits * typed_char_width
              + ENTER_KEY_GAP + ENTER_KEY_SIZE[0] + ENTER_KEY_INSET)
 
     entry_box = pygame.Rect(0, 0, width, ENTRY_BOX_HEIGHT)
     entry_box.center = (CENTER_X, ENTRY_BOX_Y)
-    entry_base_points = rounded_box_points(entry_box)
-    entry_image = make_box_image(jitter_points(entry_base_points), entry_box, FIELD_COLOR, TEXT_COLOR)
+    boxes["entry"] = make_box(entry_box, FIELD_COLOR, TEXT_COLOR)
 
 def make_history_box(max_tries, max_digits):
-    global history_box, history_base_points, history_image
+    global history_box
     columns = max_tries - max_tries // 2            # the bottom row is the widest
     slot_width = history_font.size("0" * max_digits)[0]
     slot_height = history_font.get_height()
@@ -440,20 +455,17 @@ def make_history_box(max_tries, max_digits):
 
     history_box = pygame.Rect(0, 0, width, height)
     history_box.midtop = (CENTER_X, HISTORY_Y - HISTORY_PADDING)
-    history_base_points = rounded_box_points(history_box)
-    history_image = make_box_image(jitter_points(history_base_points), history_box,
-                                   HISTORY_BOX_COLOR, None)
+    boxes["history"] = make_box(history_box, HISTORY_BOX_COLOR, None)
 
 def make_range_track():
-    global range_track, range_track_points, range_track_image
+    global range_track
     range_track = pygame.Rect((0, 0), RANGE_BAR_SIZE)
     range_track.midtop = (CENTER_X, RANGE_BAR_Y)
-    range_track_points = rounded_box_points(range_track, radius=RANGE_BAR_SIZE[1] // 2)
-    range_track_image = make_box_image(jitter_points(range_track_points, RANGE_BAR_WOBBLE), range_track,
-                                       (0, 0, 0, 0), MUTED_COLOR)
+    boxes["range_track"] = make_box(range_track, (0, 0, 0, 0), MUTED_COLOR,
+                                    radius=RANGE_BAR_SIZE[1] // 2, wobble=RANGE_BAR_WOBBLE)
 
 def make_range_fill():
-    global range_fill, range_fill_points, range_fill_image
+    global range_fill
     low, high = game.narrowed_range()
     total = game.range_highest - game.range_lowest + 1      # how many numbers the bar covers
 
@@ -463,9 +475,7 @@ def make_range_fill():
     width = max(round(right - left), 2)                     # never thinner than 2 px
     range_fill = pygame.Rect(round(left), range_track.top, width, range_track.height)
     radius = min(range_track.height // 2, width // 2)
-    range_fill_points = rounded_box_points(range_fill, radius=radius)
-    range_fill_image = make_box_image(jitter_points(range_fill_points, RANGE_BAR_WOBBLE), range_fill,
-                                      RANGE_FILL_COLOR, None)
+    boxes["range_fill"] = make_box(range_fill, RANGE_FILL_COLOR, None, radius=radius, wobble=RANGE_BAR_WOBBLE)
 
     set_range_labels()
 
@@ -529,9 +539,8 @@ def clicked_bar_icon(pos):
 def apply_theme(new_theme, new_mode):
     # Switch to a theme and remake everything that has a color
     global theme, mode, background
-    global cursor_on, cursor_off, cursor_poses
-    global token_frames_filled, token_frames_empty, enter_image, space_image
-    global enter_poses, space_poses
+    global cursor_on, cursor_off
+    global token_frames_filled, token_frames_empty
 
     # A new background only when the theme changes, so a mode switch keeps the ripples
     if background is None or new_theme != theme:
@@ -782,7 +791,6 @@ warning_modal_overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
 
 warning_modal_panel = pygame.Rect((0, 0), WARNING_MODAL_SIZE)
 warning_modal_panel.center = (CENTER_X, HEIGHT // 2)
-warning_modal_base_points = rounded_box_points(warning_modal_panel, radius=s(16), edge_steps=16)
 
 warning_modal_yes_button = make_button("yes")
 warning_modal_no_button = make_button("no")
@@ -800,6 +808,7 @@ all_buttons = [
 background = None
 labels = {}                     # every wobbly text, by name; filled in by apply_theme and the setters
 sprites = {}                    # every wobbly image, by name
+boxes = {}                      # every boiling box, by name
 apply_theme(theme, mode)
 
 ### =====================================================
@@ -983,6 +992,10 @@ while running:
         for sprite in sprites.values():
             reanimate(sprite)
 
+        # All boxes
+        for box in boxes.values():
+            rejitter(box)
+
         # Buttons
         for button in all_buttons:
             rewobble(button)
@@ -993,18 +1006,7 @@ while running:
             icon["poses"] = make_poses([icon["frames"][0]], "subtle")
 
         # Game screen
-        entry_points = jitter_points(entry_base_points)
-        entry_image = make_box_image(entry_points, entry_box, FIELD_COLOR, TEXT_COLOR)
-
-        history_image = make_box_image(jitter_points(history_base_points), history_box,
-                                       HISTORY_BOX_COLOR, None)
-
-        range_track_image = make_box_image(jitter_points(range_track_points, RANGE_BAR_WOBBLE), range_track,
-                                           (0, 0, 0, 0), MUTED_COLOR)
-
-        range_fill_image = make_box_image(jitter_points(range_fill_points, RANGE_BAR_WOBBLE), range_fill,
-                                          RANGE_FILL_COLOR, None)
-
+        
         for label in range_labels:
             rewobble(label)
 
@@ -1053,18 +1055,25 @@ while running:
         draw_stacked(sprites["tokens"]["letters"], sprites["tokens"]["poses"], CENTER_X, TOKENS_Y, TOKEN_GAP, TOKEN_ROW_GAP)
 
         if game.difficulty in RANGE_BAR_MODES:
-            screen.blit(range_fill_image, range_fill_image.get_rect(center=range_fill.center))
-            screen.blit(range_track_image, range_track_image.get_rect(center=range_track.center))
+            draw_box(boxes["range_fill"])
+            draw_box(boxes["range_track"])
             for label in range_labels:
                 draw_label(label, label["x"], label["y"])
 
-        screen.blit(entry_image, entry_image.get_rect(center=entry_box.center))
+        draw_box(boxes["entry"])
 
         can_type = (game.round_over == False and game.warning_modal_open == False
                     and game.settings_open == False and len(game.typed_guess) < game.max_digits)
 
-        line_letters = labels["typed"]["letters"] + [cursor_image]
-        line_poses = labels["typed"]["poses"] + sprites["cursor"]["poses"]
+        line_letters = labels["typed"]["letters"]
+        line_poses = labels["typed"]["poses"]
+        if can_type == True:
+            if (now // CURSOR_BLINK) % 2 == 0:
+                cursor_image = cursor_on
+            else:
+                cursor_image = cursor_off
+            line_letters = labels["typed"]["letters"] + [cursor_image]
+            line_poses = labels["typed"]["poses"] + sprites["cursor"]["poses"]
 
         if len(line_letters) > 0:
             draw_wobbly(line_letters, line_poses, entry_box.left + ENTRY_PADDING,
@@ -1088,7 +1097,7 @@ while running:
         draw_label(labels["message"], CENTER_X, MESSAGE_Y)
 
         draw_label(labels["tries"], CENTER_X, TRIES_Y)
-        screen.blit(history_image, history_image.get_rect(center=history_box.center))
+        draw_box(boxes["history"])
         draw_stacked(sprites["history"]["letters"], sprites["history"]["poses"], CENTER_X, HISTORY_Y,
                      HISTORY_GAP, HISTORY_ROW_GAP)
 
@@ -1125,7 +1134,7 @@ while running:
     # Warning modal drawn last so it sits on top of everything
     if game.warning_modal_open == True:
         screen.blit(warning_modal_overlay, (0, 0))
-        screen.blit(warning_modal_image, warning_modal_image.get_rect(center=warning_modal_panel.center))
+        draw_box(boxes["warning"])
 
         draw_label(labels["warning"], CENTER_X, warning_modal_panel.top + WARNING_QUESTION_OFFSET)
 
