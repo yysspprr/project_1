@@ -603,13 +603,6 @@ def setting_choices(name):
     elif name == "mode":
         return ["dark", "light"]
 
-def setting_value(name):
-    # What a setting is set to right now
-    if name == "theme":
-        return theme
-    elif name == "mode":
-        return mode
-
 def change_setting(name, step):
     # Go to the next (step 1) or previous (step -1) choice, wrapping around, and save it
     choices = setting_choices(name)
@@ -618,15 +611,6 @@ def change_setting(name, step):
     save_settings(settings)
 
     apply_theme(settings["theme"], settings["mode"])
-    # Go to the next (step 1) or previous (step -1) choice, wrapping around
-    choices = setting_choices(name)
-    index = (choices.index(setting_value(name)) + step) % len(choices)
-    new_value = choices[index]
-
-    if name == "theme":
-        apply_theme(new_value, mode)
-    elif name == "mode":
-        apply_theme(theme, new_value)
 
 def set_settings_rows():
     global settings_rows
@@ -635,7 +619,7 @@ def set_settings_rows():
         settings_rows.append({
             "name": name,
             "label": make_label(name, small_font, MUTED_COLOR, SETTINGS_LABEL_X, 0),
-            "value": make_label(setting_value(name), small_font, TEXT_COLOR, SETTINGS_VALUE_X, 0),
+            "value": make_label(settings(name), small_font, TEXT_COLOR, SETTINGS_VALUE_X, 0),
             "left": make_button("<"),
             "right": make_button(">"),
         })

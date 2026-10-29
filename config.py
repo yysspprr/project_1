@@ -13,7 +13,7 @@ from pathlib import Path
 import pygame
 
 # =======================================================
-# 1.2 Saved settings                                    #
+# 1.2 - Saved settings                                    #
 # =======================================================
 
 BASE_DIR = Path(__file__).parent
