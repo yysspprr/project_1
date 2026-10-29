@@ -1039,6 +1039,156 @@ def wobble_everything():
         background.wobble()
 
 # =======================================================
+# 4.3 - Drawing                                         #
+# =======================================================
+
+def draw_screen():
+    # Back to front: background, the current screen, the bar and panel, then the modal on top
+    if background is None:
+        screen.fill(BG_COLOR)
+    else:
+        background.draw(screen, palette)
+
+    if game.screen == "menu":
+        draw_menu()
+    elif game.screen == "difficulty":
+        draw_difficulty()
+    elif game.screen == "game":
+        draw_game()
+
+    draw_bar()
+    draw_settings_panel()
+
+    if game.warning_modal_open == True:
+        draw_warning_modal()
+
+# --- Screens ---
+
+def draw_menu():
+    draw_label(labels["title"], CENTER_X, TITLE_Y)
+    draw_button(new_game_button, NEW_GAME_Y)
+    draw_button(free_mode_button, FREE_MODE_Y)
+    draw_button(exit_button, EXIT_Y)
+
+def draw_difficulty():
+    draw_label(labels["difficulty_title"], CENTER_X, TITLE_Y)
+    draw_button(easy_button, EASY_Y)
+    draw_button(normal_button, NORMAL_Y)
+    draw_button(hard_button, HARD_Y)
+
+def draw_game():
+    # Status: what you're guessing, and how you're doing
+    draw_label(labels["heading"], CENTER_X, HEADING_Y)
+    draw_label(labels["range"], CENTER_X, RANGE_Y)
+    draw_label(labels["difficulty"], CENTER_X, DIFFICULTY_LABEL_Y)
+    draw_label(labels["round"], CENTER_X, ROUND_Y)
+    draw_label(sprites["hearts"], CENTER_X, HEARTS_Y)
+    draw_stacked(sprites["tokens"]["letters"], sprites["tokens"]["poses"], CENTER_X, TOKENS_Y,
+                 TOKEN_GAP, TOKEN_ROW_GAP)
+
+    # Play: range bar, message, entry box, space key
+    if game.difficulty in RANGE_BAR_MODES:
+        draw_range_bar()
+    draw_label(labels["message"], CENTER_X, MESSAGE_Y)
+    draw_entry()
+    if game.round_over == True:
+        draw_space_cue()
+
+    # Record: tries left and the guess history
+    draw_label(labels["tries"], CENTER_X, TRIES_Y)
+    draw_box(boxes["history"])
+    draw_stacked(sprites["history"]["letters"], sprites["history"]["poses"], CENTER_X, HISTORY_Y,
+                 HISTORY_GAP, HISTORY_ROW_GAP)
+
+# --- Parts of the game screen ---
+
+def draw_range_bar():
+    draw_box(boxes["range_fill"])
+    draw_box(boxes["range_track"])
+    for label in range_labels:
+        draw_label(label, label["x"], label["y"])
+
+def draw_entry():
+    draw_box(boxes["entry"])
+
+    # The typed digits, plus a blinking cursor while you can type
+    can_type = (game.round_over == False and game.warning_modal_open == False
+                and game.settings_open == False and len(game.typed_guess) < game.max_digits)
+
+    line_letters = labels["typed"]["letters"]
+    line_poses = labels["typed"]["poses"]
+    if can_type == True:
+        if (pygame.time.get_ticks() // CURSOR_BLINK) % 2 == 0:
+            cursor_image = cursor_on
+        else:
+            cursor_image = cursor_off
+        line_letters = labels["typed"]["letters"] + [cursor_image]
+        line_poses = labels["typed"]["poses"] + sprites["cursor"]["poses"]
+
+    if len(line_letters) > 0:
+        draw_wobbly(line_letters, line_poses, entry_box.left + ENTRY_PADDING,
+                    entry_box.centery - typed_font.get_height() // 2, align="left")
+
+    # The enter key, once there's something to submit
+    if game.typed_guess != "" and game.round_over == False:
+        enter_x = entry_box.right - ENTER_KEY_INSET - ENTER_KEY_SIZE[0] // 2
+        enter_y = entry_box.centery - ENTER_KEY_SIZE[1] // 2
+        draw_label(sprites["enter"], enter_x, enter_y)
+
+def draw_space_cue():
+    # After a round: the space key, with "next round" or "play again" under it
+    if game.result() == "playing":
+        next_label = labels["continue"]
+    else:
+        next_label = labels["play_again"]
+
+    space_y = entry_box.bottom + SPACE_BAR_KEY_GAP
+    draw_label(sprites["space"], CENTER_X, space_y)
+    draw_label(next_label, CENTER_X, space_y + SPACE_BAR_KEY_SIZE[1] + SPACE_BAR_KEY_LABEL_GAP)
+
+# --- On every screen ---
+
+def draw_bar():
+    bar_top = HEIGHT - BAR_HEIGHT - settings_offset()
+    icon_y = bar_top + (BAR_HEIGHT - BAR_ICON_SIZE) // 2
+    screen.blit(bar_surface, (0, bar_top))
+
+    x = BAR_PADDING + BAR_ICON_SIZE // 2
+    for icon in bar_icons():
+        draw_icon_button(icon, x, icon_y)
+        x += BAR_ICON_SIZE + BAR_ICON_GAP
+
+    draw_icon_button(settings_icon, WIDTH - BAR_PADDING - BAR_ICON_SIZE // 2, icon_y)
+
+def draw_settings_panel():
+    # Revealed below the bar as it slides up
+    if settings_offset() == 0:
+        return
+
+    panel_top = HEIGHT - settings_offset()
+    pygame.draw.rect(screen, BG_COLOR, (0, panel_top, WIDTH, SETTINGS_PANEL_HEIGHT))
+    screen.blit(settings_panel_surface, (0, panel_top))
+
+    # Arrows use the bigger menu font, so move them up to line up with the rows
+    arrow_shift = (small_font.get_height() - menu_font.get_height()) // 2
+
+    for position in range(len(settings_rows)):
+        row = settings_rows[position]
+        y = panel_top + SETTINGS_ROW_TOP + position * SETTINGS_ROW_GAP
+
+        draw_label(row["label"], SETTINGS_LABEL_X, y, align="left")
+        draw_label(row["value"], SETTINGS_VALUE_X, y)
+        draw_button(row["left"], y + arrow_shift, center_x=SETTINGS_VALUE_X - SETTINGS_ARROW_GAP, layer="panel")
+        draw_button(row["right"], y + arrow_shift, center_x=SETTINGS_VALUE_X + SETTINGS_ARROW_GAP, layer="panel")
+
+def draw_warning_modal():
+    screen.blit(warning_modal_overlay, (0, 0))
+    draw_box(boxes["warning"])
+    draw_label(labels["warning"], CENTER_X, warning_modal_panel.top + WARNING_QUESTION_OFFSET)
+    draw_button(warning_modal_yes_button, warning_modal_panel.top + WARNING_YES_OFFSET, layer="modal")
+    draw_button(warning_modal_no_button, warning_modal_panel.top + WARNING_NO_OFFSET, layer="modal")
+
+# =======================================================
 # 4.4 - Main loop                                       #
 # =======================================================
 
@@ -1051,124 +1201,7 @@ while game.running:
         handle_event(event)
 
     update(dt)
-
-    # ===================================================
-    # 4.4 - Draw                                        #
-    # ===================================================
-
-    if background is None:
-        screen.fill(BG_COLOR)
-    else:
-        background.draw(screen, palette)
-
-    if game.screen == "menu":
-        draw_label(labels["title"], CENTER_X, TITLE_Y)
-
-        draw_button(new_game_button, NEW_GAME_Y)
-        draw_button(free_mode_button, FREE_MODE_Y)
-        draw_button(exit_button, EXIT_Y)
-
-    if game.screen == "difficulty":
-        draw_label(labels["difficulty_title"], CENTER_X, TITLE_Y)
-
-        draw_button(easy_button, EASY_Y)
-        draw_button(normal_button, NORMAL_Y)
-        draw_button(hard_button, HARD_Y)
-
-    if game.screen == "game":
-        draw_label(labels["heading"], CENTER_X, HEADING_Y)
-        draw_label(labels["range"], CENTER_X, RANGE_Y)
-        draw_label(labels["difficulty"], CENTER_X, DIFFICULTY_LABEL_Y)
-        draw_label(labels["round"], CENTER_X, ROUND_Y)
-        draw_label(sprites["hearts"], CENTER_X, HEARTS_Y)
-        draw_stacked(sprites["tokens"]["letters"], sprites["tokens"]["poses"], CENTER_X, TOKENS_Y, TOKEN_GAP, TOKEN_ROW_GAP)
-
-        if game.difficulty in RANGE_BAR_MODES:
-            draw_box(boxes["range_fill"])
-            draw_box(boxes["range_track"])
-            for label in range_labels:
-                draw_label(label, label["x"], label["y"])
-
-        draw_box(boxes["entry"])
-
-        can_type = (game.round_over == False and game.warning_modal_open == False
-                    and game.settings_open == False and len(game.typed_guess) < game.max_digits)
-
-        line_letters = labels["typed"]["letters"]
-        line_poses = labels["typed"]["poses"]
-        if can_type == True:
-            if (pygame.time.get_ticks() // CURSOR_BLINK) % 2 == 0:
-                cursor_image = cursor_on
-            else:
-                cursor_image = cursor_off
-            line_letters = labels["typed"]["letters"] + [cursor_image]
-            line_poses = labels["typed"]["poses"] + sprites["cursor"]["poses"]
-
-        if len(line_letters) > 0:
-            draw_wobbly(line_letters, line_poses, entry_box.left + ENTRY_PADDING,
-                    entry_box.centery - typed_font.get_height() // 2, align="left")
-
-        if game.typed_guess != "" and game.round_over == False:
-            enter_x = entry_box.right - ENTER_KEY_INSET - ENTER_KEY_SIZE[0] // 2
-            enter_y = entry_box.centery - ENTER_KEY_SIZE[1] // 2
-            draw_label(sprites["enter"], enter_x, enter_y)
-
-        if game.round_over == True:
-            if game.result() == "playing":
-                next_label = labels["continue"]
-            else:
-                next_label = labels["play_again"]
-
-            space_y = entry_box.bottom + SPACE_BAR_KEY_GAP
-            draw_label(sprites["space"], CENTER_X, space_y)
-            draw_label(next_label, CENTER_X, space_y + SPACE_BAR_KEY_SIZE[1] + SPACE_BAR_KEY_LABEL_GAP)
-
-        draw_label(labels["message"], CENTER_X, MESSAGE_Y)
-
-        draw_label(labels["tries"], CENTER_X, TRIES_Y)
-        draw_box(boxes["history"])
-        draw_stacked(sprites["history"]["letters"], sprites["history"]["poses"], CENTER_X, HISTORY_Y,
-                     HISTORY_GAP, HISTORY_ROW_GAP)
-
-    # Bottom bar, on every screen
-    bar_top = HEIGHT - BAR_HEIGHT - settings_offset()
-    icon_y = bar_top + (BAR_HEIGHT - BAR_ICON_SIZE) // 2
-    screen.blit(bar_surface, (0, bar_top))
-
-    # Settings panel, revealed below the bar as it slides up
-    if settings_offset() > 0:
-        panel_top = bar_top + BAR_HEIGHT
-        pygame.draw.rect(screen, BG_COLOR, (0, panel_top, WIDTH, SETTINGS_PANEL_HEIGHT))
-        screen.blit(settings_panel_surface, (0, panel_top))
-
-        # Arrows use the bigger menu font, so move them up to line up with the rows
-        arrow_shift = (small_font.get_height() - menu_font.get_height()) // 2
-
-        for position in range(len(settings_rows)):
-            row = settings_rows[position]
-            y = panel_top + SETTINGS_ROW_TOP + position * SETTINGS_ROW_GAP
-
-            draw_label(row["label"], SETTINGS_LABEL_X, y, align="left")
-            draw_label(row["value"], SETTINGS_VALUE_X, y)
-            draw_button(row["left"], y + arrow_shift, center_x=SETTINGS_VALUE_X - SETTINGS_ARROW_GAP, layer="panel")
-            draw_button(row["right"], y + arrow_shift, center_x=SETTINGS_VALUE_X + SETTINGS_ARROW_GAP, layer="panel")
-
-    x = BAR_PADDING + BAR_ICON_SIZE // 2
-    for icon in bar_icons():
-        draw_icon_button(icon, x, icon_y)
-        x += BAR_ICON_SIZE + BAR_ICON_GAP
-
-    draw_icon_button(settings_icon, WIDTH - BAR_PADDING - BAR_ICON_SIZE // 2, icon_y)
-
-    # Warning modal drawn last so it sits on top of everything
-    if game.warning_modal_open == True:
-        screen.blit(warning_modal_overlay, (0, 0))
-        draw_box(boxes["warning"])
-
-        draw_label(labels["warning"], CENTER_X, warning_modal_panel.top + WARNING_QUESTION_OFFSET)
-
-        draw_button(warning_modal_yes_button, warning_modal_panel.top + WARNING_YES_OFFSET, layer="modal")
-        draw_button(warning_modal_no_button, warning_modal_panel.top + WARNING_NO_OFFSET, layer="modal")
+    draw_screen()
 
     pygame.display.flip()
     dt = clock.tick(FPS)            # milliseconds since the last frame
