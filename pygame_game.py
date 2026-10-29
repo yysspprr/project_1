@@ -146,11 +146,21 @@ def make_button(text):
         "hover_letters": make_letters(text, menu_font, ACCENT_COLOR),
         "poses": make_poses(letters),
         "rect": pygame.Rect(0, 0, 0, 0),
+        "style": "strong",
     }
 
-def make_label(text, font, color, x, y, style="subtle"):
-    letters = make_letters(text, font, color)
-    return {"letters": letters, "poses": make_poses(letters, style), "x": x, "y": y, "style": style}
+def make_label(text, font, color, style="subtle", digit_font=None, x=0, y=0):
+    # A wobbly piece of text: its letter images, their poses and how strongly it wobbles
+    letters = make_letters(text, font, color, digit_font)
+    return {"letters": letters, "poses": make_poses(letters, style), "style": style, "x": x, "y": y}
+
+def draw_label(label, x, y, align="center"):
+    if len(label["letters"]) > 0:               # an empty label (like no message) draws nothing
+        draw_wobbly(label["letters"], label["poses"], x, y, align=align)
+
+def rewobble(label):
+    # New poses in the label's own style; works for buttons too
+    label["poses"] = make_poses(label["letters"], label["style"])
 
 def draw_button(button, y, center_x=CENTER_X, layer="screen"):
     # Only buttons on the top layer react to the mouse: modal, then panel, then screen
@@ -287,14 +297,9 @@ def start_game(difficulty):
     next_round()
 
 def set_game_labels():
-    global difficulty_label_letters, difficulty_label_poses, range_letters, range_poses
-
-    difficulty_label_letters = make_letters(f"{game.difficulty} mode", tiny_font, MUTED_COLOR)
-    difficulty_label_poses = make_poses(difficulty_label_letters, "subtle")
-
-    range_letters = make_letters(f"({game.range_lowest}-{game.range_highest})", small_heading_font, TEXT_COLOR,
-                                 small_heading_digit_font)
-    range_poses = make_poses(range_letters, "normal")
+    labels["difficulty"] = make_label(f"{game.difficulty} mode", tiny_font, MUTED_COLOR, "subtle")
+    labels["range"] = make_label(f"({game.range_lowest}-{game.range_highest})", small_heading_font, TEXT_COLOR,
+                                 "normal", small_heading_digit_font)
 
 def next_round():
     game.secret = random.randint(game.range_lowest, game.range_highest)
@@ -326,18 +331,13 @@ def end_round(won_round):
 
 def set_game_message(text):
     game.message = text
-    global message_letters, message_poses
-    message_letters = make_letters(text, small_font, TEXT_COLOR, small_digit_font)
-    message_poses = make_poses(message_letters, "normal")
+    labels["message"] = make_label(text, small_font, TEXT_COLOR, "normal", small_digit_font)
 
 def set_typed(text):
-    global typed_letters, typed_poses
     game.typed_guess = text
-    typed_letters = make_letters(text, typed_font, ACCENT_COLOR)
-    typed_poses = make_poses(typed_letters, "typed")
+    labels["typed"] = make_label(text, typed_font, ACCENT_COLOR, "typed")
 
 def set_tries_label():
-    global tries_letters, tries_poses
     tries_left = game.max_tries - game.try_count
 
     if tries_left == 1:
@@ -345,14 +345,11 @@ def set_tries_label():
     else:
         text = f"{tries_left} tries left"
 
-    tries_letters = make_letters(text, tiny_font, MUTED_COLOR, tiny_digit_font)
-    tries_poses = make_poses(tries_letters, "subtle")
+    labels["tries"] = make_label(text, tiny_font, MUTED_COLOR, "subtle", tiny_digit_font)
 
 def set_round_label():
-    global round_letters, round_poses
     round_number = game.rounds_played + 1
-    round_letters = make_letters(f"round {round_number}", tiny_font, TEXT_COLOR, tiny_digit_font)
-    round_poses = make_poses(round_letters, "subtle")
+    labels["round"] = make_label(f"round {round_number}", tiny_font, TEXT_COLOR, "subtle", tiny_digit_font)
 
 def set_hearts():
     global heart_images, heart_poses
@@ -404,15 +401,14 @@ def make_history_images():
     return images
 
 def open_warning_modal(action, question):
-    global warning_modal_letters, warning_modal_poses, warning_modal_image
+    global warning_modal_image
 
     game.warning_modal_open = True
     game.warning_modal_action = action
-    warning_modal_letters = make_letters(question, menu_font, TEXT_COLOR)
-    warning_modal_poses = make_poses(warning_modal_letters, "normal")
+    labels["warning"] = make_label(question, menu_font, TEXT_COLOR, "normal")
 
     warning_modal_image = make_box_image(jitter_points(warning_modal_base_points), warning_modal_panel,
-                                        FIELD_COLOR, TEXT_COLOR)
+                                         FIELD_COLOR, TEXT_COLOR)
 
 def make_entry_box(max_digits):
     global entry_box, entry_base_points, entry_image
@@ -471,13 +467,14 @@ def set_range_labels():
 
     # Ends of the track
     range_labels = [
-        make_label(str(game.range_lowest), range_label_font, MUTED_COLOR, range_track.left, below_y),
-        make_label(str(game.range_highest), range_label_font, MUTED_COLOR, range_track.right, below_y),
+        make_label(str(game.range_lowest), range_label_font, MUTED_COLOR, x=range_track.left, y=below_y),
+        make_label(str(game.range_highest), range_label_font, MUTED_COLOR, x=range_track.right, y=below_y),
     ]
 
     # Round over: the fill has shrunk to the secret, so show the answer
     if game.round_over == True:
-        range_labels.append(make_label(str(game.secret), range_label_font, TEXT_COLOR, range_fill.centerx, above_y))
+        range_labels.append(make_label(str(game.secret), range_label_font, TEXT_COLOR,
+                                       x=range_fill.centerx, y=above_y))
         return
 
     # The closest guesses on each side, at the edges of the fill
@@ -489,14 +486,15 @@ def set_range_labels():
         needed = (below_width + above_width) / 2 + RANGE_LABEL_MIN_GAP
 
         if range_fill.width < needed:
-            range_labels.append(make_label(f"{below}-{above}", range_label_font, TEXT_COLOR, range_fill.centerx, above_y))
+            range_labels.append(make_label(f"{below}-{above}", range_label_font, TEXT_COLOR,
+                                           x=range_fill.centerx, y=above_y))
         else:
-            range_labels.append(make_label(str(below), range_label_font, TEXT_COLOR, range_fill.left, above_y))
-            range_labels.append(make_label(str(above), range_label_font, TEXT_COLOR, range_fill.right, above_y))
+            range_labels.append(make_label(str(below), range_label_font, TEXT_COLOR, x=range_fill.left, y=above_y))
+            range_labels.append(make_label(str(above), range_label_font, TEXT_COLOR, x=range_fill.right, y=above_y))
     elif below is not None:
-        range_labels.append(make_label(str(below), range_label_font, TEXT_COLOR, range_fill.left, above_y))
+        range_labels.append(make_label(str(below), range_label_font, TEXT_COLOR, x=range_fill.left, y=above_y))
     elif above is not None:
-        range_labels.append(make_label(str(above), range_label_font, TEXT_COLOR, range_fill.right, above_y))
+        range_labels.append(make_label(str(above), range_label_font, TEXT_COLOR, x=range_fill.right, y=above_y))
 
 def bar_icons():
     # The icons on the left side of the bar, depending on the screen
@@ -522,9 +520,7 @@ def clicked_bar_icon(pos):
 def apply_theme(new_theme, new_mode):
     # Switch to a theme and remake everything that has a color
     global theme, mode, background
-    global title_letters, title_poses, difficulty_title_letters, difficulty_title_poses
-    global heading_letters, heading_poses, cursor_on, cursor_off, cursor_poses
-    global continue_letters, continue_poses, play_again_letters, play_again_poses
+    global cursor_on, cursor_off, cursor_poses
     global token_frames_filled, token_frames_empty, enter_frames, space_frames, enter_image, space_image
     global enter_poses, space_poses
 
@@ -537,12 +533,9 @@ def apply_theme(new_theme, new_mode):
     set_palette(theme, mode)
 
     # Titles and headings
-    title_letters = make_letters("guesstimate!", title_font, TEXT_COLOR)
-    title_poses = make_poses(title_letters)
-    difficulty_title_letters = make_letters("pick a difficulty", menu_font, TEXT_COLOR)
-    difficulty_title_poses = make_poses(difficulty_title_letters, "normal")
-    heading_letters = make_letters("guess a number", small_heading_font, TEXT_COLOR)
-    heading_poses = make_poses(heading_letters, "normal")
+    labels["title"] = make_label("guesstimate!", title_font, TEXT_COLOR, "strong")
+    labels["difficulty_title"] = make_label("pick a difficulty", menu_font, TEXT_COLOR, "normal")
+    labels["heading"] = make_label("guess a number", small_heading_font, TEXT_COLOR, "normal")
 
     # Buttons and bar icons
     for button in all_buttons:
@@ -566,10 +559,8 @@ def apply_theme(new_theme, new_mode):
     cursor_on = typed_font.render(CURSOR_SYMBOL, True, MUTED_COLOR)
     cursor_off = pygame.Surface(cursor_on.get_size(), pygame.SRCALPHA)
     cursor_poses = make_poses([cursor_on], "typed")
-    continue_letters = make_letters("next round", tiny_font, MUTED_COLOR)
-    continue_poses = make_poses(continue_letters, "subtle")
-    play_again_letters = make_letters("play again", tiny_font, MUTED_COLOR)
-    play_again_poses = make_poses(play_again_letters, "subtle")
+    labels["continue"] = make_label("next round", tiny_font, MUTED_COLOR)
+    labels["play_again"] = make_label("play again", tiny_font, MUTED_COLOR)
 
     # See-through layers
     bar_surface.fill(BAR_COLOR)
@@ -619,8 +610,8 @@ def set_settings_rows():
     for name in SETTINGS_ROWS:
         settings_rows.append({
             "name": name,
-            "label": make_label(name, small_font, MUTED_COLOR, SETTINGS_LABEL_X, 0),
-            "value": make_label(settings[name], small_font, TEXT_COLOR, SETTINGS_VALUE_X, 0),
+            "label": make_label(name, small_font, MUTED_COLOR),
+            "value": make_label(settings[name], small_font, TEXT_COLOR),
             "left": make_button("<"),
             "right": make_button(">"),
         })
@@ -786,10 +777,6 @@ warning_modal_panel = pygame.Rect((0, 0), WARNING_MODAL_SIZE)
 warning_modal_panel.center = (CENTER_X, HEIGHT // 2)
 warning_modal_base_points = rounded_box_points(warning_modal_panel, radius=s(16), edge_steps=16)
 
-# Filled in by open_warning_modal
-warning_modal_letters = []
-warning_modal_poses = []
-
 warning_modal_yes_button = make_button("yes")
 warning_modal_no_button = make_button("no")
 
@@ -804,6 +791,7 @@ all_buttons = [
 # =======================================================
 
 background = None
+labels = {}                     # every wobbly text, by name; filled in by apply_theme and the setters
 apply_theme(theme, mode)
 
 ### =====================================================
@@ -912,7 +900,8 @@ while running:
             elif event.key == pygame.K_BACKSPACE:
                 set_typed(game.typed_guess[:-1])
             elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                result = logic.check_guess(game.typed_guess, game.secret, game.range_lowest, game.range_highest, game.guessed_list)
+                result = (logic.check_guess(game.typed_guess, game.secret, game.range_lowest,
+                                            game.range_highest, game.guessed_list))
                 set_typed("")
 
                 if result in ("too high", "too low", "correct"):
@@ -940,8 +929,8 @@ while running:
                     end_round(False)
 
         # Space: move on once a round is over
-        if (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and game.screen == "game" and game.round_over == True
-            and game.warning_modal_open == False and game.settings_open == False):
+        if (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and game.screen == "game" 
+            and game.round_over == True and game.warning_modal_open == False and game.settings_open == False):
 
             if game.result() == "playing":
                 next_round()
@@ -978,27 +967,20 @@ while running:
 
     if now - last_wobble >= WOBBLE_INTERVAL and game.warning_modal_open == False:
 
+        # All labels
+        for label in labels.values():
+            rewobble(label)
+
         # Buttons
         for button in all_buttons:
-            button["poses"] = make_poses(button["letters"])
+            rewobble(button)
 
         # Bottom bar icons
         for icon in all_icons:
             icon["frame"] = random.randrange(FRAME_COUNT)
             icon["poses"] = make_poses([icon["frames"][0]], "subtle")
 
-        # Menu
-        title_poses = make_poses(title_letters)
-
-        # Difficulty screen
-        difficulty_title_poses = make_poses(difficulty_title_letters, "normal")
-
         # Game screen
-        heading_poses = make_poses(heading_letters, "normal")
-        range_poses = make_poses(range_letters, "normal")
-        difficulty_label_poses = make_poses(difficulty_label_letters, "subtle")
-        round_poses = make_poses(round_letters, "subtle")
-
         heart_images = make_heart_images()
         heart_poses = make_poses(heart_images)
 
@@ -1006,8 +988,6 @@ while running:
         token_poses = make_poses(token_images)
 
         history_poses = make_poses(history_images, "typed")
-
-        tries_poses = make_poses(tries_letters, "subtle")
 
         entry_points = jitter_points(entry_base_points)
         entry_image = make_box_image(entry_points, entry_box, FIELD_COLOR, TEXT_COLOR)
@@ -1022,9 +1002,8 @@ while running:
                                           RANGE_FILL_COLOR, None)
 
         for label in range_labels:
-            label["poses"] = make_poses(label["letters"], label["style"])
+            rewobble(label)
 
-        typed_poses = make_poses(typed_letters, "typed")
         cursor_poses = make_poses([cursor_on], "typed")
 
         enter_image = random.choice(enter_frames)
@@ -1032,20 +1011,13 @@ while running:
 
         space_image = random.choice(space_frames)
         space_poses = make_poses([space_image], "subtle")
-        continue_poses = make_poses(continue_letters, "subtle")
-        play_again_poses = make_poses(play_again_letters, "subtle")
-
-        message_poses = make_poses(message_letters, "normal")
-
-        # Warning modal
-        warning_modal_poses = make_poses(warning_modal_letters, "normal")
 
         # Settings rows
         for row in settings_rows:
-            row["label"]["poses"] = make_poses(row["label"]["letters"], row["label"]["style"])
-            row["value"]["poses"] = make_poses(row["value"]["letters"], row["value"]["style"])
-            row["left"]["poses"] = make_poses(row["left"]["letters"])
-            row["right"]["poses"] = make_poses(row["right"]["letters"])
+            rewobble(row["label"])
+            rewobble(row["value"])
+            rewobble(row["left"])
+            rewobble(row["right"])
 
         # Background
         if background is not None:
@@ -1063,24 +1035,24 @@ while running:
         background.draw(screen, palette)
 
     if game.screen == "menu":
-        draw_wobbly(title_letters, title_poses, CENTER_X, TITLE_Y)
+        draw_label(labels["title"], CENTER_X, TITLE_Y)
 
         draw_button(new_game_button, NEW_GAME_Y)
         draw_button(free_mode_button, FREE_MODE_Y)
         draw_button(exit_button, EXIT_Y)
 
     if game.screen == "difficulty":
-        draw_wobbly(difficulty_title_letters, difficulty_title_poses, CENTER_X, TITLE_Y)
+        draw_label(labels["difficulty_title"], CENTER_X, TITLE_Y)
 
         draw_button(easy_button, EASY_Y)
         draw_button(normal_button, NORMAL_Y)
         draw_button(hard_button, HARD_Y)
 
     if game.screen == "game":
-        draw_wobbly(heading_letters, heading_poses, CENTER_X, HEADING_Y)
-        draw_wobbly(range_letters, range_poses, CENTER_X, RANGE_Y)
-        draw_wobbly(difficulty_label_letters, difficulty_label_poses, CENTER_X, DIFFICULTY_LABEL_Y)
-        draw_wobbly(round_letters, round_poses, CENTER_X, ROUND_Y)
+        draw_label(labels["heading"], CENTER_X, HEADING_Y)
+        draw_label(labels["range"], CENTER_X, RANGE_Y)
+        draw_label(labels["difficulty"], CENTER_X, DIFFICULTY_LABEL_Y)
+        draw_label(labels["round"], CENTER_X, ROUND_Y)
         draw_wobbly(heart_images, heart_poses, CENTER_X, HEARTS_Y)
         draw_stacked(token_images, token_poses, CENTER_X, TOKENS_Y, TOKEN_GAP, TOKEN_ROW_GAP)
 
@@ -1088,22 +1060,15 @@ while running:
             screen.blit(range_fill_image, range_fill_image.get_rect(center=range_fill.center))
             screen.blit(range_track_image, range_track_image.get_rect(center=range_track.center))
             for label in range_labels:
-                draw_wobbly(label["letters"], label["poses"], label["x"], label["y"])
+                draw_label(label, label["x"], label["y"])
 
         screen.blit(entry_image, entry_image.get_rect(center=entry_box.center))
 
         can_type = (game.round_over == False and game.warning_modal_open == False
                     and game.settings_open == False and len(game.typed_guess) < game.max_digits)
 
-        line_letters = typed_letters
-        line_poses = typed_poses
-        if can_type == True:
-            if (now // CURSOR_BLINK) % 2 == 0:
-                cursor_image = cursor_on
-            else:
-                cursor_image = cursor_off
-            line_letters = typed_letters + [cursor_image]
-            line_poses = typed_poses + cursor_poses
+        line_letters = labels["typed"]["letters"]
+        line_poses = labels["typed"]["poses"]
 
         if len(line_letters) > 0:
             draw_wobbly(line_letters, line_poses, entry_box.left + ENTRY_PADDING,
@@ -1116,18 +1081,17 @@ while running:
 
         if game.round_over == True:
             if game.result() == "playing":
-                label_letters, label_poses = continue_letters, continue_poses
+                next_label = labels["continue"]
             else:
-                label_letters, label_poses = play_again_letters, play_again_poses
+                next_label = labels["play_again"]
 
             space_y = entry_box.bottom + SPACE_BAR_KEY_GAP
             draw_wobbly([space_image], space_poses, CENTER_X, space_y)
-            draw_wobbly(label_letters, label_poses, CENTER_X, space_y + SPACE_BAR_KEY_SIZE[1] + SPACE_BAR_KEY_LABEL_GAP)
+            draw_label(next_label, CENTER_X, space_y + SPACE_BAR_KEY_SIZE[1] + SPACE_BAR_KEY_LABEL_GAP)
 
-        if len(message_letters) > 0:
-            draw_wobbly(message_letters, message_poses, CENTER_X, MESSAGE_Y)
+        draw_label(labels["message"], CENTER_X, MESSAGE_Y)
 
-        draw_wobbly(tries_letters, tries_poses, CENTER_X, TRIES_Y)
+        draw_label(labels["tries"], CENTER_X, TRIES_Y)
         screen.blit(history_image, history_image.get_rect(center=history_box.center))
         draw_stacked(history_images, history_poses, CENTER_X, HISTORY_Y, HISTORY_GAP, HISTORY_ROW_GAP)
 
@@ -1149,8 +1113,8 @@ while running:
             row = settings_rows[position]
             y = panel_top + SETTINGS_ROW_TOP + position * SETTINGS_ROW_GAP
 
-            draw_wobbly(row["label"]["letters"], row["label"]["poses"], SETTINGS_LABEL_X, y, align="left")
-            draw_wobbly(row["value"]["letters"], row["value"]["poses"], SETTINGS_VALUE_X, y)
+            draw_label(row["label"], SETTINGS_LABEL_X, y, align="left")
+            draw_label(row["value"], SETTINGS_VALUE_X, y)
             draw_button(row["left"], y + arrow_shift, center_x=SETTINGS_VALUE_X - SETTINGS_ARROW_GAP, layer="panel")
             draw_button(row["right"], y + arrow_shift, center_x=SETTINGS_VALUE_X + SETTINGS_ARROW_GAP, layer="panel")
 
@@ -1166,7 +1130,7 @@ while running:
         screen.blit(warning_modal_overlay, (0, 0))
         screen.blit(warning_modal_image, warning_modal_image.get_rect(center=warning_modal_panel.center))
 
-        draw_wobbly(warning_modal_letters, warning_modal_poses, CENTER_X, warning_modal_panel.top + WARNING_QUESTION_OFFSET)
+        draw_label(labels["warning"], CENTER_X, warning_modal_panel.top + WARNING_QUESTION_OFFSET)
 
         draw_button(warning_modal_yes_button, warning_modal_panel.top + WARNING_YES_OFFSET, layer="modal")
         draw_button(warning_modal_no_button, warning_modal_panel.top + WARNING_NO_OFFSET, layer="modal")
