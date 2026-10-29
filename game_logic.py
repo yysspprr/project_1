@@ -1,6 +1,6 @@
 STARTING_LIVES = 3
 
-def check_guess(guess, secret, range_lowest, range_highest, guessed_list):
+def check_guess(guess, secret, range_lowest, range_highest, guesses):
     try:
         number = int(guess)
     except ValueError:
@@ -9,9 +9,8 @@ def check_guess(guess, secret, range_lowest, range_highest, guessed_list):
     if number < range_lowest or number > range_highest:
         return "out of range"
 
-    if number in guessed_list:
+    if number in guesses:
         return "repeat"
-    guessed_list.append(number)
 
     if number > secret:
         return "too high"
@@ -61,22 +60,22 @@ def after_round(lives, tokens, won_round, difficulty):
             lives -= 1
     return lives, tokens
 
-def narrowed_range(guessed_list, secret, range_lowest, range_highest):
+def narrowed_range(guesses, secret, range_lowest, range_highest):
     low = range_lowest
     high = range_highest
-    for guess in guessed_list:
+    for guess in guesses:
         if guess < secret:
             low = max(low, guess + 1)       # too low: the answer is above it
         elif guess > secret:
             high = min(high, guess - 1)     # too high: the answer is below it
     return low, high
 
-def closest_guesses(guessed_list, secret):
+def closest_guesses(guesses, secret):
     # The highest guess below the secret and the lowest guess above it
     # (None if there's no guess on that side yet)
     below = None
     above = None
-    for guess in guessed_list:
+    for guess in guesses:
         if guess < secret:
             if below is None or guess > below:
                 below = guess
