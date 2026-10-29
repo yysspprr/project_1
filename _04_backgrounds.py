@@ -6,7 +6,7 @@ import random
 
 import pygame
 
-from config import WIDTH, HEIGHT, s
+from _05_config import WIDTH, HEIGHT, s
 
 
 class RainBackground:
