@@ -89,6 +89,8 @@ HISTORY_PADDING = s(10)                 # space between the box edge and the slo
 BAR_HEIGHT = s(44)
 BAR_ICON_SIZE = s(26)
 
+SETTINGS_PANEL_HEIGHT = s(200)
+
 # =======================================================
 # 1.5 - Layout (positions)                              #
 # =======================================================
@@ -139,8 +141,7 @@ HISTORY_ROW_GAP = s(6)                  # space between the two rows
 BAR_PADDING = s(16)                     # space between the window edge and the outer icons
 BAR_ICON_GAP = s(12)                    # space between icons
 
-SETTINGS_PANEL_HEIGHT = s(200)
-SETTINGS_PANEL_MARGIN = s(12)           # space around the panel: window sides and above the bar
+SETTINGS_SLIDE_TIME = 250               # milliseconds for the bar to slide fully open or closed
 
 # Warning modal offsets (measured down from the panel's top edge)
 WARNING_QUESTION_OFFSET = s(30)

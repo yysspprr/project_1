@@ -502,17 +502,17 @@ def bar_icons():
     else:
         return []
 
+def settings_offset():
+    # How many pixels the bar has slid up: 0 when closed, the panel height when open
+    eased = 1 - (1 - settings_slide) ** 2          # fast at first, slowing down at the end
+    return round(SETTINGS_PANEL_HEIGHT * eased)
+
 def clicked_bar_icon(pos):
     # Which visible bar icon was clicked, or None
     for icon in bar_icons() + [settings_icon]:
         if icon["rect"].collidepoint(pos):
             return icon
     return None
-
-def make_settings_panel():
-    global settings_panel_image
-    settings_panel_image = make_box_image(jitter_points(settings_panel_points), settings_panel,
-                                          FIELD_COLOR, TEXT_COLOR)
 
 def apply_theme(new_theme, new_mode):
     # Switch to a theme and remake everything that has a color
@@ -569,6 +569,7 @@ def apply_theme(new_theme, new_mode):
     # See-through layers
     bar_surface.fill(BAR_COLOR)
     warning_modal_overlay.fill(OVERLAY_COLOR)
+    settings_panel_surface.fill(BAR_COLOR)
 
     # Game screen: boxes and setters, rebuilt from the current game
     make_entry_box(game.max_digits)
@@ -583,9 +584,6 @@ def apply_theme(new_theme, new_mode):
     set_hearts()
     set_tokens()
     set_history()
-
-    # Settings panel
-    make_settings_panel()
 
 # =======================================================
 # 2.3 - Game state class                                #
@@ -712,10 +710,8 @@ bar_surface = pygame.Surface((WIDTH, BAR_HEIGHT), pygame.SRCALPHA)
 # 3.7 - Settings panel setup                            #
 # =======================================================
 
-settings_panel = pygame.Rect(0, 0, WIDTH - SETTINGS_PANEL_MARGIN * 2, SETTINGS_PANEL_HEIGHT)
-settings_panel.bottom = HEIGHT - BAR_HEIGHT - SETTINGS_PANEL_MARGIN
-settings_panel.centerx = CENTER_X
-settings_panel_points = rounded_box_points(settings_panel, radius=s(16), edge_steps=16)
+settings_panel_surface = pygame.Surface((WIDTH, SETTINGS_PANEL_HEIGHT), pygame.SRCALPHA)
+settings_slide = 0              # 0 = closed, 1 = fully open; changes a bit every frame
 
 # =======================================================
 # 3.8 - Warning modal setup                             #
@@ -743,7 +739,7 @@ all_buttons = [
 ]
 
 # =======================================================
-# 3.8 - Starting values                                 #
+# 3.9 - Starting values                                 #
 # =======================================================
 
 background = None
@@ -799,8 +795,8 @@ while running:
             elif clicked_icon is settings_icon:
                 game.settings_open = not game.settings_open
             elif game.settings_open == True:
-                if not settings_panel.collidepoint(event.pos):
-                    game.settings_open = False         # a click outside the panel closes it
+                if event.pos[1] < HEIGHT - BAR_HEIGHT - settings_offset():
+                    game.settings_open = False         # a click above the bar closes the panel
             elif clicked_icon is home_icon:
                 if game.has_progress() == True:
                     open_warning_modal("menu", "leave this game?")
@@ -835,9 +831,12 @@ while running:
                     start_game("hard")
 
         # Keyboard
-        if event.type == pygame.KEYDOWN and game.screen == "game" and game.round_over == False and game.warning_modal_open == False:
+        if (event.type == pygame.KEYDOWN and game.screen == "game" and game.round_over == False
+            and game.warning_modal_open == False and game.settings_open == False):
+
             if event.unicode.isdigit() and len(game.typed_guess) < game.max_digits:
                 set_typed(game.typed_guess + event.unicode)
+
             elif event.key == pygame.K_BACKSPACE:
                 set_typed(game.typed_guess[:-1])
             elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
@@ -869,7 +868,9 @@ while running:
                     end_round(False)
 
         # Space: move on once a round is over
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and game.screen == "game" and game.round_over == True and game.warning_modal_open == False:
+        if (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and game.screen == "game" and game.round_over == True
+            and game.warning_modal_open == False and game.settings_open == False):
+
             if game.result() == "playing":
                 next_round()
             else:
@@ -900,6 +901,13 @@ while running:
 
     if background is not None and game.warning_modal_open == False:
         background.update(dt)
+
+    # Slide the bar toward open or closed
+    step = dt / SETTINGS_SLIDE_TIME
+    if game.settings_open == True:
+        settings_slide = min(settings_slide + step, 1)
+    else:
+        settings_slide = max(settings_slide - step, 0)
 
     if now - last_wobble >= WOBBLE_INTERVAL and game.warning_modal_open == False:
 
@@ -964,8 +972,6 @@ while running:
 
         # Warning modal
         warning_modal_poses = make_poses(warning_modal_letters, "normal")
-
-        make_settings_panel()
 
         # Background
         if background is not None:
@@ -1051,9 +1057,15 @@ while running:
         draw_stacked(history_images, history_poses, CENTER_X, HISTORY_Y, HISTORY_GAP, HISTORY_ROW_GAP)
 
     # Bottom bar, on every screen
-    bar_top = HEIGHT - BAR_HEIGHT
+    bar_top = HEIGHT - BAR_HEIGHT - settings_offset()
     icon_y = bar_top + (BAR_HEIGHT - BAR_ICON_SIZE) // 2
     screen.blit(bar_surface, (0, bar_top))
+
+    # Settings panel, revealed below the bar as it slides up
+    if settings_offset() > 0:
+        panel_top = bar_top + BAR_HEIGHT
+        pygame.draw.rect(screen, BG_COLOR, (0, panel_top, WIDTH, SETTINGS_PANEL_HEIGHT))
+        screen.blit(settings_panel_surface, (0, panel_top))
 
     x = BAR_PADDING + BAR_ICON_SIZE // 2
     for icon in bar_icons():
@@ -1061,10 +1073,6 @@ while running:
         x += BAR_ICON_SIZE + BAR_ICON_GAP
 
     draw_icon_button(settings_icon, WIDTH - BAR_PADDING - BAR_ICON_SIZE // 2, icon_y)
-
-    # Settings panel, above the bar
-    if game.settings_open == True:
-        screen.blit(settings_panel_image, settings_panel_image.get_rect(center=settings_panel.center))
 
     # Warning modal drawn last so it sits on top of everything
     if game.warning_modal_open == True:
