@@ -987,7 +987,59 @@ def continue_after_round():
         start_game(game.difficulty)
 
 # =======================================================
-# 4.1 - Loop setup                                      #
+# 4.2 - Update                                          #
+# =======================================================
+
+def update(dt):
+    # Everything that moves on its own: the background, the settings bar and the wobble
+    global last_wobble
+
+    if background is not None and game.warning_modal_open == False:
+        background.update(dt)
+    slide_settings_bar(dt)
+
+    now = pygame.time.get_ticks()
+    if now - last_wobble >= WOBBLE_INTERVAL and game.warning_modal_open == False:
+        wobble_everything()
+        last_wobble = now
+
+def slide_settings_bar(dt):
+    # Move the bar a little toward open or closed
+    step = dt / SETTINGS_SLIDE_TIME
+    if game.settings_open == True:
+        game.settings_slide = min(game.settings_slide + step, 1)
+    else:
+        game.settings_slide = max(game.settings_slide - step, 0)
+
+def wobble_everything():
+    # New poses, frames and box outlines for everything that boils
+    for label in labels.values():
+        rewobble(label)
+    for sprite in sprites.values():
+        reanimate(sprite)
+    for box in boxes.values():
+        rejitter(box)
+    for button in all_buttons:
+        rewobble(button)
+
+    for icon in all_icons:
+        icon["frame"] = random.randrange(FRAME_COUNT)
+        icon["poses"] = make_poses([icon["frames"][0]], "subtle")
+
+    for label in range_labels:
+        rewobble(label)
+
+    for row in settings_rows:
+        rewobble(row["label"])
+        rewobble(row["value"])
+        rewobble(row["left"])
+        rewobble(row["right"])
+
+    if background is not None:
+        background.wobble()
+
+# =======================================================
+# 4.4 - Main loop                                       #
 # =======================================================
 
 last_wobble = 0
@@ -998,61 +1050,7 @@ while game.running:
     for event in pygame.event.get():
         handle_event(event)
 
-    # ===================================================
-    # 4.3 - Update                                      #
-    # ===================================================
-
-    now = pygame.time.get_ticks()
-
-    if background is not None and game.warning_modal_open == False:
-        background.update(dt)
-
-    # Slide the bar toward open or closed
-    step = dt / SETTINGS_SLIDE_TIME
-    if game.settings_open == True:
-        game.settings_slide = min(game.settings_slide + step, 1)
-    else:
-        game.settings_slide = max(game.settings_slide - step, 0)
-
-    if now - last_wobble >= WOBBLE_INTERVAL and game.warning_modal_open == False:
-
-        # All labels
-        for label in labels.values():
-            rewobble(label)
-
-        # All sprites
-        for sprite in sprites.values():
-            reanimate(sprite)
-
-        # All boxes
-        for box in boxes.values():
-            rejitter(box)
-
-        # Buttons
-        for button in all_buttons:
-            rewobble(button)
-
-        # Bottom bar icons
-        for icon in all_icons:
-            icon["frame"] = random.randrange(FRAME_COUNT)
-            icon["poses"] = make_poses([icon["frames"][0]], "subtle")
-
-        # Game screen
-        for label in range_labels:
-            rewobble(label)
-
-        # Settings rows
-        for row in settings_rows:
-            rewobble(row["label"])
-            rewobble(row["value"])
-            rewobble(row["left"])
-            rewobble(row["right"])
-
-        # Background
-        if background is not None:
-            background.wobble()
-
-        last_wobble = now
+    update(dt)
 
     # ===================================================
     # 4.4 - Draw                                        #
@@ -1099,7 +1097,7 @@ while game.running:
         line_letters = labels["typed"]["letters"]
         line_poses = labels["typed"]["poses"]
         if can_type == True:
-            if (now // CURSOR_BLINK) % 2 == 0:
+            if (pygame.time.get_ticks() // CURSOR_BLINK) % 2 == 0:
                 cursor_image = cursor_on
             else:
                 cursor_image = cursor_off
