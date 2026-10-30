@@ -17,7 +17,7 @@ import pygame
 # =======================================================
 
 BASE_DIR = Path(__file__).parent.parent     # the project folder: one up from game/
-SETTINGS_PATH = BASE_DIR / "settings.json"
+SETTINGS_PATH = BASE_DIR / "data" / "settings.json"
 
 DEFAULT_SETTINGS = {
     "theme": "plain",

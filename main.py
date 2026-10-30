@@ -22,6 +22,7 @@ from partials.drawing import *
 from partials.themes import THEMES
 from partials.backgrounds import make_background
 from partials.config import *
+from partials.stats import load_stats, record_game
 
 # =======================================================
 # 1.2 - Colors                                          #
@@ -162,6 +163,7 @@ def start_game(difficulty):
     game.rounds_played = 0
     game.rounds_won = 0
     game.total_tries = 0
+    game.first_tries = 0
     set_hearts()
     set_tokens()
     next_round()
@@ -197,6 +199,8 @@ def end_round(won_round):
 
     if won_round:
         game.rounds_won += 1
+        if game.try_count == 1:
+            game.first_tries += 1
     
     game.lives, game.tokens = logic.after_round(game.lives, game.tokens, won_round, game.difficulty)
     set_hearts()
@@ -388,6 +392,8 @@ def clicked_bar_icon(pos):
         if icon["rect"].collidepoint(pos):
             return icon
     return None
+
+stats = load_stats()            # the player's stats per regular mode, from stats.json
 
 def apply_theme():
     # Use the theme and mode from settings, and remake everything that has a color
@@ -615,6 +621,9 @@ def start_free_game():
 
 def open_results():
     game.screen = "results"
+    if game.difficulty != "free":
+        record_game(stats, game.difficulty, game.result() == "game won",
+                    game.total_tries, game.rounds_played, game.first_tries)
     set_results()
 
 def set_results():
@@ -693,6 +702,8 @@ class GameState:
         self.rounds_played = 0
         self.rounds_won = 0
         self.total_tries = 0            # guesses over the whole game, all rounds together
+
+        self.first_tries = 0            # rounds guessed on the very first try
 
         # Current round
         self.secret = 0

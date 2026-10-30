@@ -5,7 +5,8 @@ assets/
 .venv/
 .DS_Store
 CLI app/
-ideas.md
+ideas/
 mockup.png
 gui.py
 settings.json
+data/
