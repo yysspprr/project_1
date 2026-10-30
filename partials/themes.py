@@ -39,18 +39,30 @@ THEMES = {
             "range_fill": "#f2d58a",
             "bar": (0, 0, 0, 50),
             "ripple": "#4a5d7a",        # the brightest a fresh ripple gets
+            "water_top": "#222d3f",     # far away: catches a little light from the sky
+            "water_bottom": "#121925",  # up close: deeper and darker
+            "glint": "#7d93b3",         # the brightest a glint of light gets
+            "rain": "#a9bbd4",          # falling streaks
+            "leaves": ["#6a7a46", "#8a6a3e", "#7a5f3a", "#5c6e4c"],     # floating leaves: one picked per leaf
+            "twig": "#6c5a45",
         },
         "light": {
-            "bg": "#e4ecf3",
-            "text": "#34445a",
-            "accent": "#c98a1c",
-            "field": "#cdd8e4",
-            "muted": "#8796aa",
+            "bg": "#b0c4d4",
+            "text": "#253244",
+            "accent": "#8a560c",
+            "field": "#d3dee8",
+            "muted": "#4b5b70",
             "overlay": (0, 0, 0, 100),
             "history_box": (0, 0, 0, 25),
-            "range_fill": "#c98a1c",
+            "range_fill": "#8a560c",
             "bar": (0, 0, 0, 25),
-            "ripple": "#a3b7cc",
+            "ripple": "#5f7890",
+            "water_top": "#c5d5e2",
+            "water_bottom": "#9db4c7",
+            "glint": "#f4f8fb",
+            "rain": "#4f677e",
+            "leaves": ["#7a8a4e", "#a27a42", "#8c6a3a", "#68805a"],
+            "twig": "#6a563f",
         },
     },
 }
