@@ -383,8 +383,8 @@ def settings_offset():
     return round(SETTINGS_PANEL_HEIGHT * eased)
 
 def clicked_bar_icon(pos):
-    # Which visible bar icon was clicked, or None
-    for icon in bar_icons() + [settings_icon]:
+    # Which active bar icon was clicked, or None
+    for icon in active_bar_icons() + [settings_icon]:
         if icon["rect"].collidepoint(pos):
             return icon
     return None

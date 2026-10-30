@@ -217,6 +217,8 @@ WARNING_NO_OFFSET = s(130)
 WOBBLE_INTERVAL = 300           # milliseconds per pose
 FRAME_COUNT = 3                 # how many drawn frames each animated image has
 
+INACTIVE_ICON_ALPHA = 90        # how see-through inactive bar icons are (0 = invisible, 255 = solid)
+
 # Wobble styles: (max pixels a letter can move, max degrees it can tilt)
 WOBBLE_STYLES = {
     "strong": (1, 6),
