@@ -147,9 +147,11 @@ NORMAL_Y = s(220)
 HARD_Y = s(280)
 
 # Stats screen
-STATS_PAGE_Y = s(130)                   # the "<  normal  >" row
-STATS_ARROW_GAP = s(90)                 # from the middle to each arrow
-STATS_LINES_Y = s(200)                  # top of the first stats line
+STATS_HEADER_Y = s(40)                  # top of the title and drop-down row
+STATS_TITLE_X = s(30)                   # left edge of the title
+STATS_DROPDOWN_SIZE = (s(180), s(40))   # the closed box, and each option in the open list
+STATS_DROPDOWN_RIGHT = WIDTH - s(30)    # right edge of the drop-down
+STATS_LINES_Y = s(130)                  # top of the first stats line
 STATS_LINE_GAP = s(34)                  # from one stats line to the next
 
 # Free mode setup screen

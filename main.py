@@ -22,8 +22,7 @@ from partials.drawing import *
 from partials.themes import THEMES
 from partials.backgrounds import make_background
 from partials.config import *
-from partials.stats import load_stats, record_game, REGULAR_MODES
-
+from partials.stats import load_stats, record_game, record_free_game, REGULAR_MODES
 # =======================================================
 # 1.2 - Colors                                          #
 # =======================================================
@@ -625,6 +624,9 @@ def open_results():
     if game.difficulty != "free":
         record_game(stats, game.difficulty, game.result() == "game won",
                     game.total_tries, game.rounds_played, game.first_tries)
+    else:
+        record_free_game(stats, game.range_lowest, game.range_highest, game.try_count,
+                         game.show_range_bar, game.show_history)
     set_results()
 
 def set_results():
@@ -673,41 +675,79 @@ def results_back_button():
 
 def open_stats():
     game.screen = "stats"
+    game.stats_dropdown_open = False
     set_stats_page()
 
 def change_stats_page(step):
-    # Next (1) or previous (-1) mode, wrapping around
-    pages = list(REGULAR_MODES)
-    index = (pages.index(game.stats_page) + step) % len(pages)
-    game.stats_page = pages[index]
+    # Next (1) or previous (-1) mode, wrapping around; used by the arrow keys
+    index = (STATS_PAGES.index(game.stats_page) + step) % len(STATS_PAGES)
+    game.stats_page = STATS_PAGES[index]
     set_stats_page()
 
 def set_stats_page():
     global stats_lines
     entry = stats[game.stats_page]
-    labels["stats_page"] = make_label(game.stats_page, menu_font, TEXT_COLOR, "normal")
 
-    lines = [
-        f"W: {entry['wins']}     L: {entry['losses']}",
-        f"streak: {entry['streak']}  (best: {entry['best_streak']})",
-    ]
+    labels["stats_page"] = make_label(f"{game.stats_page} mode", menu_font, TEXT_COLOR, "normal")
 
-    if entry["best_win"] is None:
-        lines.append("best win: none yet")
+    dropdown = pygame.Rect((0, 0), STATS_DROPDOWN_SIZE)
+    dropdown.topright = (STATS_DROPDOWN_RIGHT, STATS_HEADER_Y)
+    boxes["stats_dropdown"] = make_box(dropdown, FIELD_COLOR, TEXT_COLOR)
+
+    options = pygame.Rect(dropdown.left, dropdown.bottom, dropdown.width, dropdown.height * len(STATS_PAGES))
+    boxes["stats_options"] = make_box(options, FIELD_COLOR, TEXT_COLOR)
+
+    if game.stats_page == "free":
+        lines = [
+            f"games played: {entry['games']}",
+            f"guesses in total: {entry['guesses']}",
+            f"no-help wins: {entry['no_help_wins']}",
+        ]
+
+        if entry["biggest_range"] is None:
+            lines.append("biggest range: none yet")
+        else:
+            low, high = entry["biggest_range"]
+            lines.append(f"biggest range: {low} to {high}")
+
+        if len(entry["recent"]) > 0:
+            lines.append("")                        # an empty line as a gap
+            lines.append("recent")
+            for played in entry["recent"]:
+                lines.append(free_game_line(played))
     else:
-        lines.append(f"best win: {entry['best_win']} guesses")
+        lines = [
+            f"W: {entry['wins']}     L: {entry['losses']}",
+            f"streak: {entry['streak']}  (best: {entry['best_streak']})",
+        ]
 
-    if entry["rounds"] > 0:
-        average = entry["guesses"] / entry["rounds"]
-        lines.append(f"average: {average:.1f} per round")
-    else:
-        lines.append("average: none yet")
+        if entry["best_win"] is None:
+            lines.append("best win: none yet")
+        else:
+            lines.append(f"best win: {entry['best_win']} guesses")
 
-    lines.append(f"first-try guesses: {entry['first_tries']}")
+        if entry["rounds"] > 0:
+            average = entry["guesses"] / entry["rounds"]
+            lines.append(f"average: {average:.1f} per round")
+        else:
+            lines.append("average: none yet")
+
+        lines.append(f"first-try guesses: {entry['first_tries']}")
 
     stats_lines = []
     for text in lines:
         stats_lines.append(make_label(text, small_font, TEXT_COLOR, "normal", small_digit_font))
+
+def free_game_line(played):
+    # "-50 to 50: 6 tries, no range bar"
+    line = f"{played['from']} to {played['to']}: {tries_text(played['tries'])}"
+    if not played["range bar"] and not played["history"]:
+        line += ", no help"
+    elif not played["range bar"]:
+        line += ", no range bar"
+    elif not played["history"]:
+        line += ", no history"
+    return line
 
 # =======================================================
 # 2.7 - Game state class                                #
@@ -724,6 +764,7 @@ class GameState:
         self.running = True
         self.settings_slide = 0         # 0 = closed, 1 = fully open; changes a bit every frame
         self.stats_page = "normal"      # which mode the stats screen shows
+        self.stats_dropdown_open = False
 
         # Difficulty
         self.difficulty = "normal"
@@ -809,9 +850,11 @@ free_mode_button = make_button("free mode")
 exit_button = make_button("exit")
 stats_button = make_button("stats")
 
-# Stats screen
-stats_left_button = make_button("<")
-stats_right_button = make_button(">")
+# Stats screen: one page per mode, picked from a drop-down
+STATS_PAGES = list(REGULAR_MODES) + ["free"]
+stats_option_buttons = {}
+for page in STATS_PAGES:
+    stats_option_buttons[page] = make_button(f"{page} mode")
 
 # =======================================================
 # 3.3 - Difficulty screen setup                         #
@@ -898,7 +941,7 @@ warning_modal_no_button = make_button("no")
 
 all_buttons = [
     new_game_button, free_mode_button, stats_button, exit_button,
-    stats_left_button, stats_right_button,
+    *stats_option_buttons.values(),
     easy_button, normal_button, hard_button,
     free_start_button,
     warning_modal_yes_button, warning_modal_no_button,
@@ -1068,10 +1111,15 @@ def click_results(pos):
         game.screen = "menu"
 
 def click_stats(pos):
-    if stats_left_button["rect"].collidepoint(pos):
-        change_stats_page(-1)
-    elif stats_right_button["rect"].collidepoint(pos):
-        change_stats_page(1)
+    if game.stats_dropdown_open:
+        for page in STATS_PAGES:
+            if stats_option_buttons[page]["rect"].collidepoint(pos):
+                game.stats_page = page
+                set_stats_page()
+                break
+        game.stats_dropdown_open = False        # any click closes the list
+    elif boxes["stats_dropdown"]["rect"].collidepoint(pos):
+        game.stats_dropdown_open = True
 
 # --- Keyboard ---
 
@@ -1301,14 +1349,29 @@ def draw_results():
     draw_button(results_menu_button, RESULTS_MENU_Y)
 
 def draw_stats():
-    draw_label(labels["stats_title"], CENTER_X, TITLE_Y)
+    dropdown = boxes["stats_dropdown"]["rect"]
+    text_y = dropdown.centery - menu_font.get_height() // 2
 
-    draw_button(stats_left_button, STATS_PAGE_Y, center_x=CENTER_X - STATS_ARROW_GAP)
-    draw_label(labels["stats_page"], CENTER_X, STATS_PAGE_Y)
-    draw_button(stats_right_button, STATS_PAGE_Y, center_x=CENTER_X + STATS_ARROW_GAP)
+    draw_label(labels["stats_title"], STATS_TITLE_X, text_y, align="left")
 
     for position in range(len(stats_lines)):
         draw_label(stats_lines[position], CENTER_X, STATS_LINES_Y + position * STATS_LINE_GAP)
+
+    # The closed box: the current page and a small triangle
+    draw_box(boxes["stats_dropdown"])
+    draw_label(labels["stats_page"], dropdown.left + s(12), text_y, align="left")
+    arrow_x = dropdown.right - s(18)
+    arrow_y = dropdown.centery
+    pygame.draw.polygon(screen, TEXT_COLOR, [(arrow_x - s(6), arrow_y - s(3)),
+                                             (arrow_x + s(6), arrow_y - s(3)),
+                                             (arrow_x, arrow_y + s(5))])
+
+    # The open list, drawn last so it covers the stats below it
+    if game.stats_dropdown_open:
+        draw_box(boxes["stats_options"])
+        for position in range(len(STATS_PAGES)):
+            option_y = dropdown.bottom + position * dropdown.height + (dropdown.height - menu_font.get_height()) // 2
+            draw_button(stats_option_buttons[STATS_PAGES[position]], option_y, center_x=dropdown.centerx)
 
 def draw_game():
     # Status: what you're guessing, and how you're doing
