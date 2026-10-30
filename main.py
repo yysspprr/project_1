@@ -22,7 +22,7 @@ from partials.drawing import *
 from partials.themes import THEMES
 from partials.backgrounds import make_background
 from partials.config import *
-from partials.stats import load_stats, record_game
+from partials.stats import load_stats, record_game, REGULAR_MODES
 
 # =======================================================
 # 1.2 - Colors                                          #
@@ -376,7 +376,7 @@ def active_bar_icons():
     # The left icons that do something on this screen (never the same as a button on screen)
     if game.screen == "game":
         return [home_icon, back_icon, restart_icon]
-    elif game.screen in ("difficulty", "free setup"):
+    elif game.screen in MENU_SUBSCREENS:
         return [back_icon]
     else:
         return []                       # menu and results: their own buttons cover it
@@ -463,6 +463,9 @@ def apply_theme():
     set_history()
     set_results()
     set_settings_rows()
+
+    labels["stats_title"] = make_label("stats", menu_font, TEXT_COLOR, "normal")
+    set_stats_page()
 
 # =======================================================
 # 2.3 - Settings functions                              #
@@ -665,7 +668,49 @@ def results_back_button():
     return results_difficulty_button
 
 # =======================================================
-# 2.6 - Game state class                                #
+# 2.6 - Stats screen functions                          #
+# =======================================================
+
+def open_stats():
+    game.screen = "stats"
+    set_stats_page()
+
+def change_stats_page(step):
+    # Next (1) or previous (-1) mode, wrapping around
+    pages = list(REGULAR_MODES)
+    index = (pages.index(game.stats_page) + step) % len(pages)
+    game.stats_page = pages[index]
+    set_stats_page()
+
+def set_stats_page():
+    global stats_lines
+    entry = stats[game.stats_page]
+    labels["stats_page"] = make_label(game.stats_page, menu_font, TEXT_COLOR, "normal")
+
+    lines = [
+        f"W: {entry['wins']}     L: {entry['losses']}",
+        f"streak: {entry['streak']}  (best: {entry['best_streak']})",
+    ]
+
+    if entry["best_win"] is None:
+        lines.append("best win: none yet")
+    else:
+        lines.append(f"best win: {entry['best_win']} guesses")
+
+    if entry["rounds"] > 0:
+        average = entry["guesses"] / entry["rounds"]
+        lines.append(f"average: {average:.1f} per round")
+    else:
+        lines.append("average: none yet")
+
+    lines.append(f"first-try guesses: {entry['first_tries']}")
+
+    stats_lines = []
+    for text in lines:
+        stats_lines.append(make_label(text, small_font, TEXT_COLOR, "normal", small_digit_font))
+
+# =======================================================
+# 2.7 - Game state class                                #
 # =======================================================
 
 class GameState:
@@ -678,6 +723,7 @@ class GameState:
         self.settings_open = False
         self.running = True
         self.settings_slide = 0         # 0 = closed, 1 = fully open; changes a bit every frame
+        self.stats_page = "normal"      # which mode the stats screen shows
 
         # Difficulty
         self.difficulty = "normal"
@@ -761,6 +807,11 @@ range_label_font = pygame.font.Font(DIGIT_FONT_PATH, RANGE_LABEL_FONT_SIZE)
 new_game_button = make_button("new game")
 free_mode_button = make_button("free mode")
 exit_button = make_button("exit")
+stats_button = make_button("stats")
+
+# Stats screen
+stats_left_button = make_button("<")
+stats_right_button = make_button(">")
 
 # =======================================================
 # 3.3 - Difficulty screen setup                         #
@@ -823,6 +874,8 @@ bar_left_icons = [home_icon, back_icon, restart_icon]       # always drawn, in t
 
 bar_surface = pygame.Surface((WIDTH, BAR_HEIGHT), pygame.SRCALPHA)
 
+MENU_SUBSCREENS = ("difficulty", "free setup", "stats")    # back goes straight to the menu
+
 # =======================================================
 # 3.7 - Settings panel setup                            #
 # =======================================================
@@ -844,7 +897,8 @@ warning_modal_yes_button = make_button("yes")
 warning_modal_no_button = make_button("no")
 
 all_buttons = [
-    new_game_button, free_mode_button, exit_button,
+    new_game_button, free_mode_button, stats_button, exit_button,
+    stats_left_button, stats_right_button,
     easy_button, normal_button, hard_button,
     free_start_button,
     warning_modal_yes_button, warning_modal_no_button,
@@ -910,6 +964,8 @@ def handle_click(pos):
         click_free_setup(pos)
     elif game.screen == "results":
         click_results(pos)
+    elif game.screen == "stats":
+        click_stats(pos)
 
 def click_warning_modal(pos):
     if warning_modal_yes_button["rect"].collidepoint(pos):
@@ -958,7 +1014,7 @@ def click_bar_icon(icon):
         else:
             game.screen = "menu"
     elif icon is back_icon:
-        if game.screen in ("difficulty", "free setup"):
+        if game.screen in MENU_SUBSCREENS:
             game.screen = "menu"
         elif game.has_progress():
             open_warning_modal("back", "leave this game?")
@@ -977,6 +1033,8 @@ def click_menu(pos):
         open_free_setup()
     elif exit_button["rect"].collidepoint(pos):
         game.running = False
+    elif stats_button["rect"].collidepoint(pos):
+        open_stats()
 
 def click_difficulty(pos):
     if easy_button["rect"].collidepoint(pos):
@@ -1009,6 +1067,12 @@ def click_results(pos):
     elif results_menu_button["rect"].collidepoint(pos):
         game.screen = "menu"
 
+def click_stats(pos):
+    if stats_left_button["rect"].collidepoint(pos):
+        change_stats_page(-1)
+    elif stats_right_button["rect"].collidepoint(pos):
+        change_stats_page(1)
+
 # --- Keyboard ---
 
 def handle_key(event):
@@ -1027,11 +1091,18 @@ def handle_key(event):
                 continue_after_round()
         else:
             handle_typing(event)
+
     elif game.screen == "free setup" and not game.settings_open:
         type_in_free_box(event)
     elif game.screen == "results" and not game.settings_open:
         if event.key == pygame.K_SPACE:
             start_game(game.difficulty)
+
+    elif game.screen == "stats" and not game.settings_open:
+        if event.key == pygame.K_LEFT:
+            change_stats_page(-1)
+        elif event.key == pygame.K_RIGHT:
+            change_stats_page(1)
 
 def handle_typing(event):
     if event.unicode.isdigit() and len(game.typed_guess) < game.max_digits:
@@ -1123,6 +1194,9 @@ def wobble_everything():
     for label in range_labels:
         rewobble(label)
 
+    for label in stats_lines:
+        rewobble(label)
+
     for row in settings_rows:
         rewobble(row["label"])
         rewobble(row["value"])
@@ -1156,6 +1230,8 @@ def draw_screen():
         draw_difficulty()
     elif game.screen == "free setup":
         draw_free_setup()
+    elif game.screen == "stats":
+        draw_stats()
     elif game.screen == "game":
         draw_game()
     elif game.screen == "results":
@@ -1173,6 +1249,7 @@ def draw_menu():
     draw_label(labels["title"], CENTER_X, TITLE_Y)
     draw_button(new_game_button, NEW_GAME_Y)
     draw_button(free_mode_button, FREE_MODE_Y)
+    draw_button(stats_button, STATS_Y)
     draw_button(exit_button, EXIT_Y)
 
 def draw_difficulty():
@@ -1222,6 +1299,16 @@ def draw_results():
     draw_button(results_again_button, RESULTS_AGAIN_Y)
     draw_button(results_back_button(), RESULTS_BACK_Y)
     draw_button(results_menu_button, RESULTS_MENU_Y)
+
+def draw_stats():
+    draw_label(labels["stats_title"], CENTER_X, TITLE_Y)
+
+    draw_button(stats_left_button, STATS_PAGE_Y, center_x=CENTER_X - STATS_ARROW_GAP)
+    draw_label(labels["stats_page"], CENTER_X, STATS_PAGE_Y)
+    draw_button(stats_right_button, STATS_PAGE_Y, center_x=CENTER_X + STATS_ARROW_GAP)
+
+    for position in range(len(stats_lines)):
+        draw_label(stats_lines[position], CENTER_X, STATS_LINES_Y + position * STATS_LINE_GAP)
 
 def draw_game():
     # Status: what you're guessing, and how you're doing

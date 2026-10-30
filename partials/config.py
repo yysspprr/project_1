@@ -137,13 +137,20 @@ SETTINGS_PANEL_HEIGHT = s(200)
 TITLE_Y = s(60)
 
 NEW_GAME_Y = s(200)
-FREE_MODE_Y = s(275)
-EXIT_Y = s(350)
+FREE_MODE_Y = s(260)
+STATS_Y = s(320)
+EXIT_Y = s(380)
 
 # Difficulty screen
 EASY_Y = s(160)
 NORMAL_Y = s(220)
 HARD_Y = s(280)
+
+# Stats screen
+STATS_PAGE_Y = s(130)                   # the "<  normal  >" row
+STATS_ARROW_GAP = s(90)                 # from the middle to each arrow
+STATS_LINES_Y = s(200)                  # top of the first stats line
+STATS_LINE_GAP = s(34)                  # from one stats line to the next
 
 # Free mode setup screen
 FREE_BOX_Y = s(170)                     # center of the two number boxes
