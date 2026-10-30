@@ -16,7 +16,7 @@ import pygame
 # 1.2 - Saved settings                                    #
 # =======================================================
 
-BASE_DIR = Path(__file__).parent.parent     # the project folder: one up from game/
+BASE_DIR = Path(__file__).parent.parent     # the project folder: one up from partials/
 SETTINGS_PATH = BASE_DIR / "data" / "settings.json"
 
 DEFAULT_SETTINGS = {
@@ -39,6 +39,7 @@ def load_settings():
     return settings
 
 def save_settings(settings):
+    SETTINGS_PATH.parent.mkdir(exist_ok=True)       # make the data folder if it isn't there yet
     with open(SETTINGS_PATH, "w") as file:
         json.dump(settings, file, indent=4)
 

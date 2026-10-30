@@ -37,6 +37,7 @@ def load_stats():
     return stats
 
 def save_stats(stats):
+    STATS_PATH.parent.mkdir(exist_ok=True)          # make the data folder if it isn't there yet
     with open(STATS_PATH, "w") as file:
         json.dump(stats, file, indent=4)
 

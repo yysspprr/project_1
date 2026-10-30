@@ -393,8 +393,6 @@ def clicked_bar_icon(pos):
             return icon
     return None
 
-stats = load_stats()            # the player's stats per regular mode, from stats.json
-
 def apply_theme():
     # Use the theme and mode from settings, and remake everything that has a color
     global background, background_theme
@@ -862,6 +860,7 @@ background_theme = None         # which theme the background was made for
 labels = {}                     # every wobbly text, by name; filled in by apply_theme and the setters
 sprites = {}                    # every wobbly image, by name
 boxes = {}                      # every boiling box, by name
+stats = load_stats()            # the player's stats per regular mode, from stats.json
 apply_theme()
 
 ### =====================================================
