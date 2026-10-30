@@ -94,25 +94,36 @@ def draw_button(button, y, center_x=CENTER_X, layer="screen"):
         letters = button["letters"]
     button["rect"] = draw_wobbly(letters, button["poses"], center_x, y)
 
+def faint_color():
+    # The muted color, mostly see-through: for things that are there but not active
+    color = pygame.Color(MUTED_COLOR)
+    color.a = INACTIVE_ICON_ALPHA
+    return color
+
 def make_icon_button(name):
     frames = load_frames(SETTINGS_PANEL_ICONS_DIR / name, name, (BAR_ICON_SIZE, BAR_ICON_SIZE))
     normal_frames = []
     hover_frames = []
+
     for frame in frames:
         normal_frames.append(tint_image(frame, TEXT_COLOR))
         hover_frames.append(tint_image(frame, ACCENT_COLOR))
+    
     return {
         "white_frames": frames,
         "frames": normal_frames,
         "hover_frames": hover_frames,
+        "inactive_frames": tint_frames(frames, faint_color()),
         "frame": 0,                             # which of the three frames is showing
         "poses": make_poses([normal_frames[0]], "subtle"),
         "rect": pygame.Rect(0, 0, 0, 0),
     }
 
-def draw_icon_button(icon, center_x, y):
-    can_hover = not game.warning_modal_open and (not game.settings_open or icon is settings_icon)
-    if can_hover and icon["rect"].collidepoint(pygame.mouse.get_pos()):
+def draw_icon_button(icon, center_x, y, active=True):
+    can_hover = active and not game.warning_modal_open and (not game.settings_open or icon is settings_icon)
+    if not active:
+        image = icon["inactive_frames"][icon["frame"]]
+    elif can_hover and icon["rect"].collidepoint(pygame.mouse.get_pos()):
         image = icon["hover_frames"][icon["frame"]]
     else:
         image = icon["frames"][icon["frame"]]
@@ -357,14 +368,14 @@ def set_range_labels():
     elif above is not None:
         range_labels.append(make_label(str(above), range_label_font, TEXT_COLOR, x=range_fill.right, y=above_y))
 
-def bar_icons():
-    # The icons on the left side of the bar, depending on the screen
+def active_bar_icons():
+    # The left icons that do something on this screen (never the same as a button on screen)
     if game.screen == "game":
         return [home_icon, back_icon, restart_icon]
     elif game.screen in ("difficulty", "free setup"):
         return [back_icon]
     else:
-        return []
+        return []                       # menu and results: their own buttons cover it
 
 def settings_offset():
     # How many pixels the bar has slid up: 0 when closed, the panel height when open
@@ -403,6 +414,7 @@ def apply_theme():
     for icon in all_icons:
         icon["frames"] = tint_frames(icon["white_frames"], TEXT_COLOR)
         icon["hover_frames"] = tint_frames(icon["white_frames"], ACCENT_COLOR)
+        icon["inactive_frames"] = tint_frames(icon["white_frames"], faint_color())
 
     # Tinted images
     token_frames_filled = tint_frames(token_frames_filled_white, ACCENT_COLOR)
@@ -797,6 +809,8 @@ restart_icon = make_icon_button("restart")
 settings_icon = make_icon_button("settings")
 
 all_icons = [home_icon, back_icon, restart_icon, settings_icon]
+
+bar_left_icons = [home_icon, back_icon, restart_icon]       # always drawn, in this order
 
 bar_surface = pygame.Surface((WIDTH, BAR_HEIGHT), pygame.SRCALPHA)
 
@@ -1279,9 +1293,10 @@ def draw_bar():
     icon_y = bar_top + (BAR_HEIGHT - BAR_ICON_SIZE) // 2
     screen.blit(bar_surface, (0, bar_top))
 
+    active = active_bar_icons()
     x = BAR_PADDING + BAR_ICON_SIZE // 2
-    for icon in bar_icons():
-        draw_icon_button(icon, x, icon_y)
+    for icon in bar_left_icons:
+        draw_icon_button(icon, x, icon_y, icon in active)
         x += BAR_ICON_SIZE + BAR_ICON_GAP
 
     draw_icon_button(settings_icon, WIDTH - BAR_PADDING - BAR_ICON_SIZE // 2, icon_y)
