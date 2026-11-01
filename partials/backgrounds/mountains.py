@@ -12,6 +12,24 @@ from partials.backgrounds.base import Layer
 from partials.backgrounds.helpers import make_jitter
 
 
+def draw_fir(surface, x, base_y, height, fir, snow, width_share=0.55, tiers=3, wobble=0.6):
+    # A snowy fir: tiers of triangles from the base up, each with a line of snow along
+    # its upper edges. wobble is how far its points may stray, in pixels
+    width = height * width_share
+    jitter = make_jitter(tiers * 3, wobble)
+    line = max(1, round(height / 18))
+    for tier in range(tiers):
+        share = tier / tiers
+        tier_bottom = base_y - height * share * 0.75
+        tier_top = base_y - height * (share * 0.75 + 0.45)
+        half = width / 2 * (1 - share * 0.55)
+        left = (x - half + jitter[tier * 3], tier_bottom)
+        right = (x + half + jitter[tier * 3 + 1], tier_bottom)
+        tip = (x + jitter[tier * 3 + 2], tier_top)
+        pygame.draw.polygon(surface, fir, [left, tip, right])
+        pygame.draw.lines(surface, snow, False, [left, tip, right], line)
+
+
 class SnowyRange(Layer):
     # Kept soft, close to the sky's colors, so it reads as far away and never fights the
     # game's text. In a storm it fades into the snow haze
@@ -100,29 +118,13 @@ class SnowyRange(Layer):
                 fir = pygame.Color(palette["fir"])
                 fir_snow = pygame.Color(palette.get("fir_snow", palette["fir"]))
                 for tree in self.firs:
-                    self.paint_fir(self.trees_image, tree, fir, fir_snow, top)
+                    draw_fir(self.trees_image, tree["x"], self.horizon + 1 - top, tree["height"], fir, fir_snow,
+                             self.FIR_WIDTH, self.FIR_TIERS, self.JITTER)
             image.blit(self.trees_image, (0, 0))
 
         self.image = image
         self.top = top
         self.painted_palette = palette
-
-    def paint_fir(self, image, tree, fir, fir_snow, top):
-        # Tiers of triangles, each with a line of snow along its upper edges
-        height = tree["height"]
-        width = height * self.FIR_WIDTH
-        base = self.horizon + 1 - top
-        jitter = make_jitter(self.FIR_TIERS * 3, self.JITTER)
-        for tier in range(self.FIR_TIERS):
-            share = tier / self.FIR_TIERS
-            tier_bottom = base - height * share * 0.75
-            tier_top = base - height * (share * 0.75 + 0.45)
-            half = width / 2 * (1 - share * 0.55)
-            left = (tree["x"] - half + jitter[tier * 3], tier_bottom)
-            right = (tree["x"] + half + jitter[tier * 3 + 1], tier_bottom)
-            tip = (tree["x"] + jitter[tier * 3 + 2], tier_top)
-            pygame.draw.polygon(image, fir, [left, tip, right])
-            pygame.draw.lines(image, fir_snow, False, [left, tip, right], 1)
 
     def wobble(self):
         self.image = None

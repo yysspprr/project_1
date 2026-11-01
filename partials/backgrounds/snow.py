@@ -9,6 +9,7 @@ from partials.backgrounds.mountains import SnowyRange
 from partials.backgrounds.snowfield import SnowField, FrozenPond, SnowSparkle
 from partials.backgrounds.flakes import Snowfall, DiamondDust
 from partials.backgrounds.aurora import Aurora
+from partials.backgrounds.village import Village
 
 
 class SnowBackground(LayeredBackground):
@@ -35,13 +36,14 @@ class SnowBackground(LayeredBackground):
         self.update_weather()
 
         # Back to front: sky and aurora, the mountains on the horizon, the snowy ground and
-        # its sparkle, the pond (reflecting the aurora), then falling snow and diamond dust
+        # its sparkle, the pond (reflecting the aurora), the village, then falling snow and diamond dust
         self.sky = self.add(Sky(self))
         self.aurora = self.add(Aurora(self))
         self.range = self.add(SnowyRange(self))
         self.ground = self.add(SnowField(self))
         self.pond = self.add(FrozenPond(self, mirrors=[self.aurora]))
         self.sparkle = self.add(SnowSparkle(self, avoid=self.pond))
+        self.village = self.add(Village(self))
         self.flakes = self.add(Snowfall(self))
         self.dust = self.add(DiamondDust(self))
 

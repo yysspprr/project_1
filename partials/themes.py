@@ -143,6 +143,12 @@ THEMES = {
             "aurora_low": "#44d8a4",    # the northern lights: green at the bottom...
             "aurora_high": "#7a62d0",   # ... fading to violet at the top
             "sparkle": "#c3d2ea",       # moonlight glinting on the snow
+            "wall": "#2b2a33",          # the village
+            "roof": "#2a2026",
+            "roof_snow": "#3e4a66",
+            "window": "#171c27",
+            "window_lit": "#ffcf73",    # warm lights coming on at night
+            "smoke": "#46526a",
             "halo": "#121a29",
             "shadow": 0.12,
         },
@@ -180,6 +186,11 @@ THEMES = {
             "sparkle_edge": "#9fb4c8",  # a blue-grey edge so white glints show on pale snow
             "dust": "#ffffff",          # diamond dust: tiny ice crystals glinting in the sunny air
             "dust_edge": "#a9bccf",
+            "wall": "#8b6b55",
+            "roof": "#6e4537",
+            "roof_snow": "#f4f7fa",
+            "window": "#4d5d70",
+            "smoke": "#b4bfca",         # grey, or it would vanish against the white snow
             "halo": "#e3eaf1",
             "shadow": 0.25,
         },
