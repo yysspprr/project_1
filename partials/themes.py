@@ -64,6 +64,7 @@ THEMES = {
             "pad_edge": "#25312e",
             "flower": "#b9a8bc",
             "flower_middle": "#c9b465",
+            "halo": "#0c121c",          # the soft glow behind text, so it stands out from the scenery
         },
         "light": {
             "bg": "#b0c4d4",
@@ -100,6 +101,7 @@ THEMES = {
             "pad_edge": "#4f6a3c",
             "flower": "#f3dbe6",
             "flower_middle": "#e8c860",
+            "halo": "#d3dee8",
         },
     },
 }

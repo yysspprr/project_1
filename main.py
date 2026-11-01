@@ -47,6 +47,7 @@ def set_palette(theme, mode):
     HISTORY_BOX_COLOR = palette["history_box"]
     RANGE_FILL_COLOR = palette["range_fill"]
     BAR_COLOR = palette["bar"]
+    set_halo(palette.get("halo"))       # a soft glow behind text, for themes with busy backgrounds
 
 set_palette(settings["theme"], settings["mode"])
 
