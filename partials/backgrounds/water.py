@@ -13,7 +13,8 @@ class WaterSurface(Layer):
     # Painted bands of color, lighter far away (top) and darker up close (bottom),
     # with soft wavy edges that boil, and a few glints of light drifting on top.
     # The bands get thinner toward the top, following the scene's perspective.
-    # A storm (the scene's weather["storm"]) dims the light and churns the water
+    # A storm (the scene's weather["storm"]) churns the water, and the glints follow the
+    # scene's weather["light"]. If the view has a horizon, the water starts there
     #
     # Palette colors it uses (each falls back to "bg" if a theme doesn't have it):
     #   "water_top", "water_bottom"     the farthest and nearest band
@@ -33,9 +34,6 @@ class WaterSurface(Layer):
     GLINT_POINTS = 5                # points along each glint
     GLINT_BEND = 1.5                # how far a glint's points wobble up and down, in pixels up close
     GLINT_SPREAD = 0.6              # how much glints crowd toward the back (see Perspective.random_y)
-    LIGHT = (0.35, 1.2)             # the light waxes and wanes between these: dull to bright glints
-    LIGHT_TIME = (5000, 12000)      # milliseconds it takes to change
-    STORM_DIM = 0.55                # how much a full storm dims the light (0 = not at all, 1 = no glints)
     STORM_ROUGH = 2.5               # how much faster the band edges churn in a full storm
 
     def __init__(self, scene):
@@ -44,7 +42,6 @@ class WaterSurface(Layer):
         self.bands_palette = None   # which palette the bands image was painted with
         self.band_lines = scene.view.rows(self.BANDS)       # where each band starts, top to bottom
         self.band_edges = self.make_band_edges()
-        self.light = self.swell(*self.LIGHT, self.LIGHT_TIME)
 
         # Start with glints already at different ages, so they don't all fade in together
         self.glints = []
@@ -86,17 +83,21 @@ class WaterSurface(Layer):
 
     def paint_bands(self, palette):
         # Paint the bands once into an image; it's only repainted on a wobble tick or a new palette
-        image = pygame.Surface((WIDTH, HEIGHT))
+        # Only the part below the horizon: the image starts there, so everything moves up by top
+        top = self.band_lines[0]
+        image = pygame.Surface((WIDTH, HEIGHT - top))
         image.fill(self.band_color(palette, 0))
         for i, heights in enumerate(self.band_edges):
-            edge = wavy_line(0, WIDTH, heights)
-            outline = edge + [(WIDTH, HEIGHT), (0, HEIGHT)]
+            edge = wavy_line(0, WIDTH, [h - top for h in heights])
+            outline = edge + [(WIDTH, HEIGHT - top), (0, HEIGHT - top)]
             pygame.draw.polygon(image, self.band_color(palette, i + 1), outline)
         self.bands_image = image
         self.bands_palette = palette
 
     def color_at(self, palette, y):
-        # The water's color at height y, so other layers can fade into it
+        # The water's color at height y, so other layers can fade into it (None above the water)
+        if y < self.band_lines[0]:
+            return None
         band = 0
         while band < self.BANDS - 1 and y >= self.band_lines[band + 1]:
             band += 1
@@ -137,11 +138,11 @@ class WaterSurface(Layer):
     def draw(self, surface, palette):
         if self.bands_image is None or self.bands_palette is not palette:
             self.paint_bands(palette)
-        surface.blit(self.bands_image, (0, 0))
+        surface.blit(self.bands_image, (0, self.band_lines[0]))
 
         view = self.scene.view
         glint_color = pygame.Color(palette.get("glint", palette["bg"]))
-        light = self.light.value * (1 - self.STORM_DIM * self.scene.weather["storm"])
+        light = self.scene.weather["light"]
         for glint in self.glints:
             progress = glint["age"] / glint["lifetime"]
             # Fade in, hold, fade out: a soft bump that peaks in the middle

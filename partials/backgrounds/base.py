@@ -11,6 +11,7 @@
 # to the same conditions without knowing about each other:
 #   "storm"     0 = calm, 1 = as wild as it gets
 #   "wind"      1 = a normal breeze
+#   "light"     1 = normal daylight or moonlight; lower when it clouds over
 #
 # There's also a quiet zone: the column in the middle where the game's text and boxes sit.
 # Busy things fade there, so the game stays easy to read. Layers ask the background
@@ -73,7 +74,7 @@ class LayeredBackground(SwellOwner):
     def __init__(self, view=None):
         self.layers = []
         self.view = view if view is not None else Perspective()
-        self.weather = {"storm": 0, "wind": 1}
+        self.weather = {"storm": 0, "wind": 1, "light": 1}
 
     def add(self, layer):
         self.layers.append(layer)
@@ -107,7 +108,11 @@ class LayeredBackground(SwellOwner):
 
     def color_at(self, palette, y):
         # The color behind things at height y, so fading things can fade into it.
-        # The back layer decides if it knows how; otherwise it's the plain background color
-        if self.layers and hasattr(self.layers[0], "color_at"):
-            return self.layers[0].color_at(palette, y)
+        # Layers that paint a backdrop (water, sky...) have a color_at of their own and
+        # answer None for heights they don't cover; the front-most one that answers wins
+        for layer in reversed(self.layers):
+            if hasattr(layer, "color_at"):
+                color = layer.color_at(palette, y)
+                if color is not None:
+                    return color
         return pygame.Color(palette["bg"])

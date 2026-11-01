@@ -1,7 +1,8 @@
 # One shared way of seeing the scene, so every layer agrees on how far away things are
 #
 # We look down at a flat surface (water, a field, a street) from an angle.
-# The bottom of the window is close to us, the top is far away. Further away:
+# The bottom of the window is close to us; the far edge of the surface is at the top of
+# the window, or at the horizon if there is one (with sky above it). Further away:
 #   - things look smaller                   (scale)
 #   - circles look more squashed            (flatten)
 #   - colors fade a little into the haze    (clarity)
@@ -16,18 +17,19 @@ from partials.config import HEIGHT
 
 class Perspective:
 
-    def __init__(self, far_scale=0.35, near_flatten=0.5, far_flatten=0.18, far_clarity=0.55):
-        self.far_scale = far_scale          # size at the top of the window, compared to the bottom
+    def __init__(self, far_scale=0.35, near_flatten=0.5, far_flatten=0.18, far_clarity=0.55, horizon=0):
+        self.horizon = horizon              # height of the far edge of the surface: 0 is the top of the window
+        self.far_scale = far_scale          # size at the far edge, compared to the bottom
         self.near_flatten = near_flatten    # height / width of a circle at the bottom
         self.far_flatten = far_flatten      # ... and at the top
         self.far_clarity = far_clarity      # how strongly things show at the top (1 = as strong as up close)
 
     def nearness(self, y):
-        # 0 at the top of the window (far), 1 at the bottom (near)
-        return max(0, min(1, y / HEIGHT))
+        # 0 at the far edge (the top, or the horizon), 1 at the bottom of the window (near)
+        return max(0, min(1, (y - self.horizon) / (HEIGHT - self.horizon)))
 
     def scale(self, y):
-        # How big things look at height y: 1 at the bottom, far_scale at the top.
+        # How big things look at height y: 1 at the bottom, far_scale at the far edge.
         # Growing in a straight line toward the bottom is how a flat surface really looks
         return self.far_scale + (1 - self.far_scale) * self.nearness(y)
 
@@ -42,7 +44,7 @@ class Perspective:
         # The height on the screen of a spot depth of the way from near (0) to far (1)
         # on the surface itself. Halfway back is well above the middle of the window
         size = 1 / (1 + (1 / self.far_scale - 1) * depth)
-        return HEIGHT * (size - self.far_scale) / (1 - self.far_scale)
+        return self.horizon + (HEIGHT - self.horizon) * (size - self.far_scale) / (1 - self.far_scale)
 
     def random_y(self, spread=1):
         # A random height for something lying on the surface.
@@ -50,7 +52,7 @@ class Perspective:
         # spread 1: every equally deep strip of surface is equally likely (more crowded far away)
         if random.random() < spread:
             return self.height_at(random.random())
-        return random.uniform(0, HEIGHT)
+        return random.uniform(self.horizon, HEIGHT)
 
     def lay_flat(self, points, x, y, angle, size):
         # Put a small shape lying on the surface at (x, y): its points (in its own
@@ -68,7 +70,7 @@ class Perspective:
 
     def rows(self, count):
         # Heights that split the window into count rows that are equally deep on the surface:
-        # thin rows far away, tall rows up close. Returns count + 1 heights, from 0 to HEIGHT
+        # thin rows far away, tall rows up close. Returns count + 1 heights, from the far edge to HEIGHT
         heights = []
         for i in range(count + 1):
             heights.append(self.height_at(1 - i / count))

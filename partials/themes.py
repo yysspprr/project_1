@@ -47,6 +47,13 @@ THEMES = {
             "twig": "#6c5a45",
             "bug": "#05080d",           # water striders: mostly you see their dimples
             "fish": "#0a0f17",          # a fish's back breaking the surface
+            "sky_top": "#0b101c",       # the night sky, top of the window
+            "sky_low": "#1d2738",       # ... and just above the horizon
+            "sky_body": "moon",         # dark mode is night
+            "body": "#ece6c8",
+            "body_glow": "#3a4560",
+            "cloud": "#232c3e",
+            "star": "#c8d2e6",
         },
         "light": {
             "bg": "#b0c4d4",
@@ -67,6 +74,12 @@ THEMES = {
             "twig": "#6a563f",
             "bug": "#26303c",
             "fish": "#3e4c5a",
+            "sky_top": "#b9c7d3",
+            "sky_low": "#dde5ec",
+            "sky_body": "sun",          # light mode is day
+            "body": "#fbf7ea",
+            "body_glow": "#f3f1e6",
+            "cloud": "#eef2f5",
         },
     },
 }
