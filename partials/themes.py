@@ -217,4 +217,67 @@ THEMES = {
             "shadow": 0.45,
         },
     },
+
+    "stream": {
+        "dark": {
+            "bg": "#1d1f1d",
+            "text": "#dbe5f2",
+            "accent": "#f2d58a",
+            "field": "#1f2d27",
+            "muted": "#8391a8",
+            "overlay": (0, 0, 0, 160),
+            "history_box": (0, 0, 0, 60),
+            "range_fill": "#f2d58a",
+            "bar": (0, 0, 0, 50),
+            "bed": "#1d1f1d",           # the brook at night: stony bed and gravel
+            "damp": "#181a19",
+            "gravel": ["#262826", "#1a1c1a", "#222421"],
+            "water": "#18303a",         # the water
+            "water_deep": "#11232b",
+            "shallows": "#1f3a44",
+            "foam": "#4d6670",
+            "rock": "#2b2f2e",          # stones
+            "rock_light": "#3a403f",
+            "rock_dark": "#1a1e1d",
+            "moss": "#22331f",
+            "bank": "#1a2a1c",          # mossy banks and what grows on them
+            "bank_dark": "#121e14",
+            "bank_speckle": ["#15241a", "#203222", "#121e15"],
+            "bank_light": "#223524",
+            "clover": "#1f3423",
+            "litter": ["#3a3020", "#33281b", "#3d3524"],
+            "halo": "#0f1512",
+            "shadow": 0.15,
+        },
+        "light": {
+            "bg": "#9a8b70",
+            "text": "#253244",
+            "accent": "#74470a",
+            "field": "#eef3ea",
+            "muted": "#4b5b70",
+            "overlay": (0, 0, 0, 100),
+            "history_box": (0, 0, 0, 25),
+            "range_fill": "#74470a",
+            "bar": (0, 0, 0, 25),
+            "bed": "#a99a7e",           # the brook by day: stony bed and gravel
+            "damp": "#968770",
+            "gravel": ["#bcb095", "#8f826b", "#a69a85"],
+            "water": "#9cc5cd",         # the water
+            "water_deep": "#7fb0bd",
+            "shallows": "#b9d8da",
+            "foam": "#f2f7f6",
+            "rock": "#8d918a",          # stones
+            "rock_light": "#b7bab2",
+            "rock_dark": "#696d66",
+            "moss": "#7fa35e",
+            "bank": "#86a564",          # mossy banks and what grows on them
+            "bank_dark": "#6c8c50",
+            "bank_speckle": ["#76975a", "#98b674", "#6c8c4c"],
+            "bank_light": "#a3c27d",
+            "clover": "#5b8a45",
+            "litter": ["#c79a52", "#b0743e", "#d2b064"],
+            "halo": "#e4eedc",
+            "shadow": 0.35,
+        },
+    },
 }

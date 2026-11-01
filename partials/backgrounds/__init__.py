@@ -3,12 +3,14 @@
 
 from partials.backgrounds.rain import RainBackground
 from partials.backgrounds.snow import SnowBackground
+from partials.backgrounds.stream import StreamBackground
 
 
 # Which background goes with which theme (themes without one use a plain color)
 BACKGROUNDS = {
     "rain": RainBackground,
     "snow": SnowBackground,
+    "stream": StreamBackground,
 }
 
 def make_background(theme):
