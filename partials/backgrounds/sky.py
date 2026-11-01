@@ -158,6 +158,12 @@ class Sky(Layer):
             pygame.draw.circle(self.disc, (0, 0, 0, 0), bite, radius)
         self.disc_light = light
 
+    def star_strength(self, dot):
+        # How bright a star is right now: it twinkles, and a storm hides it
+        twinkle = 0.5 + 0.5 * math.sin(self.time / dot["period"] * 2 * math.pi + dot["phase"])
+        strength = self.STAR_STRENGTH[0] + (self.STAR_STRENGTH[1] - self.STAR_STRENGTH[0]) * twinkle
+        return strength * (1 - self.scene.weather["storm"])
+
     def color_at(self, palette, y):
         if y >= self.horizon:
             return None
@@ -191,9 +197,7 @@ class Sky(Layer):
         if palette.get("star"):
             star = pygame.Color(palette["star"])
             for dot in self.stars:
-                twinkle = 0.5 + 0.5 * math.sin(self.time / dot["period"] * 2 * math.pi + dot["phase"])
-                strength = self.STAR_STRENGTH[0] + (self.STAR_STRENGTH[1] - self.STAR_STRENGTH[0]) * twinkle
-                strength *= (1 - storm) * self.scene.keep(dot["x"], self.STAR_QUIET)
+                strength = self.star_strength(dot) * self.scene.keep(dot["x"], self.STAR_QUIET)
                 color = self.sky_color(palette, dot["y"]).lerp(star, max(0, min(1, strength)))
                 pygame.draw.circle(surface, color, (dot["x"], dot["y"]), s(1.2) if dot["big"] else 1)
 

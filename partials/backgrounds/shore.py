@@ -1,6 +1,7 @@
 # The far side of the water: faint hills and a treeline sitting on the horizon,
 # and their reflection in the water, broken up into strips by the ripples.
-# Also the reflections of the sky's clouds, if the scene has a sky
+# If the scene has a sky, the water also reflects what's in it: the clouds,
+# the sun or moon, and the stars
 
 import math
 
@@ -25,7 +26,7 @@ class FarShore(Layer):
     TREE_HEIGHT = 14                # tallest treetops, in pixels at the medium size
     TREE_WIDTH = (8, 17)            # how wide one tree's crown is
     FIRS = 0.25                     # share of the trees that are pointed firs
-    HILL_HEIGHT = 22                # tallest hilltop
+    HILL_HEIGHT = 32                # tallest hilltop
     JITTER = 0.6                    # how far outline points wobble, in pixels
 
     REFLECT_DEPTH = 0.75            # how tall the reflection is, compared to the shore itself
@@ -39,6 +40,19 @@ class FarShore(Layer):
     CLOUD_SQUASH = 0.45             # the reflections are flatter than the clouds
     CLOUD_DEPTH = 0.8               # how far below the horizon they land, compared to how high the cloud is
 
+    BODY_REFLECT = 0.75             # how strongly the sun or moon shows in the water
+    BODY_GLOW_REFLECT = 0.45        # ... and its glow
+    BODY_SQUASH = 0.8               # its reflection is a little flatter than the real thing
+    BODY_STRIP = (1.5, 3)           # the reflection is broken into strips this tall, in pixels
+    BODY_STRIP_GAP = (0.6, 1.4)
+    BODY_SHIFT = 2.5                # how far each strip slides sideways
+
+    STAR_REFLECT = 0.55             # how strongly the stars show in the water
+    STAR_DEPTH = 0.85               # how far below the horizon they land, compared to how high the star is
+    STAR_SHIMMER = 1.5              # how far a reflected star jumps sideways on each wobble
+    STAR_BROKEN = 0.2               # chance a reflected star is broken up by a ripple on each wobble
+    STAR_QUIET = 0.6                # how much they fade behind the game's text
+
     def __init__(self, scene, sky=None):
         super().__init__(scene)
         self.sky = sky              # the sky layer, for reflecting its clouds (optional)
@@ -51,6 +65,10 @@ class FarShore(Layer):
         self.reflect_image = None
         self.painted_palette = None
         self.cloud_images = []      # (cloud image, its reflection) pairs, so each is only flipped once
+        self.body_images = []       # the same for the sun or moon and its glow
+        self.body_strips = []
+        self.star_shimmer = []
+        self.shake_reflections()
 
     # ---- Shapes ----
 
@@ -132,17 +150,83 @@ class FarShore(Layer):
         self.reflect_image = reflection
         self.painted_palette = palette
 
-    def reflect_cloud(self, image):
-        # A cloud's image turned upside down and flattened
+    def reflect(self, image, squash):
+        # An image turned upside down and flattened
         flipped = pygame.transform.flip(image, False, True)
-        height = max(1, int(image.get_height() * self.CLOUD_SQUASH))
+        height = max(1, int(image.get_height() * squash))
         return pygame.transform.scale(flipped, (image.get_width(), height))
+
+    def reflected(self, image, squash, cache):
+        # The reflection of image, made once and kept while the image stays the same
+        for source, made in cache:
+            if source is image:
+                return made
+        made = self.reflect(image, squash)
+        cache.append((image, made))
+        if len(cache) > 8:
+            del cache[0]
+        return made
+
+    def shake_reflections(self):
+        # New breaks in the sun or moon's reflection, and new shimmer for the stars
+        self.body_strips = []
+        y = 0
+        while y < s(40):
+            tall = random.uniform(*self.BODY_STRIP)
+            self.body_strips.append((y, tall, random.uniform(-1, 1) * self.BODY_SHIFT))
+            y += tall + random.uniform(*self.BODY_STRIP_GAP)
+        count = len(self.sky.stars) if self.sky is not None else 0
+        self.star_shimmer = []
+        for i in range(count):
+            broken = random.random() < self.STAR_BROKEN
+            self.star_shimmer.append(None if broken else random.uniform(-1, 1) * self.STAR_SHIMMER)
+
+    def draw_body_reflection(self, surface, palette, clear):
+        # The sun or moon mirrored below the horizon, broken into strips, over its reflected glow
+        sky = self.sky
+        light = max(0, min(1, self.scene.weather["light"]))
+        y = self.horizon + (self.horizon - sky.body_y) * self.CLOUD_DEPTH
+
+        if sky.glow_image is not None:
+            glow = self.reflected(sky.glow_image, self.BODY_SQUASH, self.body_images)
+            glow.set_alpha(int(255 * self.BODY_GLOW_REFLECT * light * clear))
+            surface.blit(glow, glow.get_rect(center=(sky.body_x, y)))
+
+        if sky.disc is None:
+            return
+        disc = self.reflected(sky.disc, self.BODY_SQUASH, self.body_images)
+        disc.set_alpha(int(255 * self.BODY_REFLECT * clear))
+        left = sky.body_x - disc.get_width() / 2
+        top = y - disc.get_height() / 2
+        for strip_top, tall, shift in self.body_strips:
+            if strip_top >= disc.get_height():
+                break
+            area = pygame.Rect(0, int(strip_top), disc.get_width(), max(1, round(tall)))
+            surface.blit(disc, (left + shift, top + int(strip_top)), area)
+
+    def draw_star_reflections(self, surface, palette, clear):
+        # Each star mirrored below the horizon as a short dash, twinkling with its star;
+        # on every wobble they shimmer sideways and a few are broken up by ripples
+        sky = self.sky
+        star = pygame.Color(palette["star"])
+        for dot, shimmer in zip(sky.stars, self.star_shimmer):
+            if shimmer is None:
+                continue
+            y = self.horizon + (self.horizon - dot["y"]) * self.STAR_DEPTH
+            x = dot["x"] + shimmer
+            strength = sky.star_strength(dot) * self.STAR_REFLECT * clear * self.scene.keep(x, self.STAR_QUIET)
+            if strength <= 0.02:
+                continue
+            water = self.scene.color_at(palette, y)
+            half = s(1.5) * self.scene.view.scale(y) + 0.5
+            pygame.draw.line(surface, water.lerp(star, min(1, strength)), (x - half, y), (x + half, y))
 
     # ---- Layer methods ----
 
     def wobble(self):
         self.jitter = make_jitter(len(self.trees) + len(self.hills), 1)
         self.strips = self.make_strips()        # the ripples break the reflection up differently
+        self.shake_reflections()
         self.shore_image = None
 
     def draw(self, surface, palette):
@@ -165,12 +249,17 @@ class FarShore(Layer):
                     if source is image:
                         reflected = made
                 if reflected is None:
-                    reflected = self.reflect_cloud(image)
+                    reflected = self.reflect(image, self.CLOUD_SQUASH)
                 used.append((image, reflected))
                 reflected.set_alpha(int(255 * self.CLOUD_REFLECT * clear))
                 below = (self.horizon - cloud["y"]) * self.CLOUD_DEPTH
                 surface.blit(reflected, reflected.get_rect(midtop=(cloud["x"], self.horizon + below)))
             self.cloud_images = used            # forget the ones that are gone
+
+        if self.sky is not None and palette.get("star"):
+            self.draw_star_reflections(surface, palette, clear)
+        if self.sky is not None and palette.get("sky_body"):
+            self.draw_body_reflection(surface, palette, clear)
 
         self.shore_image.set_alpha(alpha)
         surface.blit(self.shore_image, (0, self.shore_top))

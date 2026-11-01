@@ -18,7 +18,8 @@ class Ripples(Layer):
     #
     # Palette colors it uses:
     #   "ripple"        the ring's color when fresh
-    #   "glint"         the light on the ring's far side (falls back to "ripple")
+    #   "ripple_light"  the light caught on the ring's far side; it should stand out from
+    #                   the water (without it: "ripple" mixed with "glint")
 
     LIFETIME = (1300, 2100)         # milliseconds a ripple lasts
     RADIUS = (25, 60)               # how wide a ripple grows, up close, in pixels
@@ -26,7 +27,7 @@ class Ripples(Layer):
     ECHOES = (1, 3)                 # how many fainter rings follow the first (fewest, most)
     ECHO_DELAY = 0.2                # how far behind each echo follows, as a share of the lifetime
     ECHO_STRENGTH = 0.55            # each echo is this much as strong as the ring before it
-    LIGHT = 0.5                     # how much of the glint color the far side catches (0 = none)
+    LIGHT = 0.5                     # without "ripple_light": how much of the glint color the far side catches
     POINTS = 24                     # points around each ring
     JITTER = 0.05                   # how far a point can wobble, as a share of the ring's size
 
@@ -78,7 +79,10 @@ class Ripples(Layer):
     def draw(self, surface, palette):
         view = self.scene.view
         ripple_color = pygame.Color(palette["ripple"])
-        light_color = ripple_color.lerp(pygame.Color(palette.get("glint", palette["ripple"])), self.LIGHT)
+        if "ripple_light" in palette:
+            light_color = pygame.Color(palette["ripple_light"])
+        else:
+            light_color = ripple_color.lerp(pygame.Color(palette.get("glint", palette["ripple"])), self.LIGHT)
 
         for ripple in self.ripples:
             water = self.scene.color_at(palette, ripple["y"])     # fade into the water right under it

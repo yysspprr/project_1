@@ -16,11 +16,13 @@ from partials.backgrounds.helpers import Swell, make_jitter
 class Reeds(Layer):
     # A clump of reeds and grass in a bottom corner. They sway in the wind (the scene's
     # weather["wind"]), bend further when it blows harder, and flinch now and then in
-    # heavy rain as drops hit them. Some have a cattail at the top
+    # heavy rain as drops hit them. Some have a cattail at the top. Each casts a soft
+    # shadow on the water, stronger when the light is bright (the scene's weather["light"])
     #
-    # Palette colors it uses:
+    # Palette colors and values it uses:
     #   "reed"          stems and blades (falls back to "muted")
     #   "reed_head"     the cattails (falls back to "reed")
+    #   "shadow"        how dark shadows are in this light, 0-1 (falls back to SHADOW)
 
     STEMS = 9
     BLADES = 12                     # thinner grass in front of the stems
@@ -40,6 +42,8 @@ class Reeds(Layer):
     FLINCH_RATE = 1.2               # flinches per second for each stem, in a full storm
     FLINCH_FADE = 250               # milliseconds for a flinch to halve
     JITTER = 0.5                    # outline wobble, in pixels
+    SHADOW = 0.25                   # how dark the shadow is in full light (0 = none, 1 = black)
+    SHADOW_OFFSET = (-4, 3)         # which way it falls: away from the sun, up in the right of the sky
 
     def __init__(self, scene, side="right", size=1, count=1):
         # size: how tall and wide the clump is, compared to normal
@@ -94,19 +98,35 @@ class Reeds(Layer):
                            HEIGHT + s(4) - stem["height"] * t))
         return points
 
+    def draw_stem(self, surface, stem, points, reed, head, shift=(0, 0)):
+        if shift != (0, 0):
+            points = [(x + shift[0], y + shift[1]) for x, y in points]
+        pygame.draw.lines(surface, reed, False, points, stem["width"])
+        if stem["cattail"]:
+            # A fat rounded head just below the tip
+            (x1, y1), (x2, y2) = points[-3], points[-2]
+            width = s(6)
+            pygame.draw.line(surface, head, (x1, y1), (x2, y2), width)
+            pygame.draw.circle(surface, head, (x1, y1), width / 2)
+            pygame.draw.circle(surface, head, (x2, y2), width / 2)
+
     def draw(self, surface, palette):
         reed = pygame.Color(palette.get("reed", palette["muted"]))
         head = pygame.Color(palette.get("reed_head", palette.get("reed", palette["muted"])))
-        for stem in self.stems:
-            points = self.stem_points(stem)
-            pygame.draw.lines(surface, reed, False, points, stem["width"])
-            if stem["cattail"]:
-                # A fat rounded head just below the tip
-                (x1, y1), (x2, y2) = points[-3], points[-2]
-                width = s(6)
-                pygame.draw.line(surface, head, (x1, y1), (x2, y2), width)
-                pygame.draw.circle(surface, head, (x1, y1), width / 2)
-                pygame.draw.circle(surface, head, (x2, y2), width / 2)
+        all_points = [self.stem_points(stem) for stem in self.stems]
+
+        # Shadows first, all of them, so no shadow falls on top of another reed
+        darkness = palette.get("shadow", self.SHADOW) * max(0, min(1, self.scene.weather["light"]))
+        if darkness > 0.01:
+            shift = (s(self.SHADOW_OFFSET[0]), s(self.SHADOW_OFFSET[1]))
+            black = pygame.Color(0, 0, 0)
+            for stem, points in zip(self.stems, all_points):
+                water = self.scene.color_at(palette, points[len(points) // 2][1])
+                shade = water.lerp(black, darkness)
+                self.draw_stem(surface, stem, points, shade, shade, shift)
+
+        for stem, points in zip(self.stems, all_points):
+            self.draw_stem(surface, stem, points, reed, head)
 
 
 class Branch(Layer):

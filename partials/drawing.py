@@ -49,6 +49,47 @@ def get_tilted(image, angle):
         tilted_cache[key] = pygame.transform.rotozoom(image, angle, 1)
     return tilted_cache[key]
 
+# Halo: a soft glow behind letters and icons, in a color close to the background,
+# so they stand out on busy animated backgrounds. Off unless a theme asks for it
+halo_color = None
+halo_cache = {}
+HALO_RADIUS = s(3)          # how far the glow reaches past the letter's edge
+HALO_STAMP = 0.16           # how solid each of the glow's many stamps is: they add up near the letter
+
+def set_halo(color):
+    # The halo color for everything drawn from now on, or None for no halo
+    global halo_color
+    halo_color = pygame.Color(color) if color is not None else None
+    halo_cache.clear()
+
+def make_halo(image, color):
+    # The image's shape in the halo color, stamped many times around itself:
+    # solid close to the shape, fading out toward the edge of the glow
+    shape = pygame.mask.from_surface(image).to_surface(setcolor=color, unsetcolor=(0, 0, 0, 0))
+    radius = HALO_RADIUS
+    halo = pygame.Surface((image.get_width() + radius * 2, image.get_height() + radius * 2), pygame.SRCALPHA)
+
+    offsets = []
+    for ring in range(1, radius + 1):
+        steps = 6 + ring * 4
+        for k in range(steps):
+            angle = 2 * math.pi * k / steps
+            offsets.append((round(math.cos(angle) * ring), round(math.sin(angle) * ring)))
+
+    # Each stamp is faint: close to the letter many overlap and it's nearly solid,
+    # further out only a few reach, so it fades away softly
+    shape.set_alpha(int(255 * HALO_STAMP))
+    for dx, dy in offsets:
+        halo.blit(shape, (radius + dx, radius + dy))
+    return halo
+
+def get_halo(image):
+    if image not in halo_cache:
+        if len(halo_cache) > 1000:
+            halo_cache.clear()
+        halo_cache[image] = make_halo(image, halo_color)
+    return halo_cache[image]
+
 def draw_wobbly(images, poses, anchor_x, y, align="center", gap=0):
     screen = pygame.display.get_surface()
     total_width = 0
@@ -60,15 +101,25 @@ def draw_wobbly(images, poses, anchor_x, y, align="center", gap=0):
         left = anchor_x
     else:
         left = anchor_x - total_width // 2
-    x = left
 
+    # Where each image goes: its center, after its little wobble
+    placed = []
+    x = left
     for position in range(len(images)):
         dx, dy, angle = poses[position]
-        tilted = get_tilted(images[position], angle)
         center = (x + images[position].get_width() // 2 + dx,
                   y + images[position].get_height() // 2 + dy)
-        screen.blit(tilted, tilted.get_rect(center=center))
+        placed.append((images[position], angle, center))
         x += images[position].get_width() + gap
+
+    # All the halos first, then the images on top, so no halo covers a neighbor
+    if halo_color is not None:
+        for image, angle, center in placed:
+            glow = get_tilted(get_halo(image), angle)
+            screen.blit(glow, glow.get_rect(center=center))
+    for image, angle, center in placed:
+        tilted = get_tilted(image, angle)
+        screen.blit(tilted, tilted.get_rect(center=center))
 
     return pygame.Rect(left, y, total_width, images[0].get_height())
 

@@ -39,6 +39,7 @@ THEMES = {
             "range_fill": "#f2d58a",
             "bar": (0, 0, 0, 50),
             "ripple": "#4a5d7a",        # the brightest a fresh ripple gets
+            "ripple_light": "#647896",  # the far side of a ripple, catching the moonlight
             "water_top": "#222d3f",     # far away: catches a little light from the sky
             "water_bottom": "#121925",  # up close: deeper and darker
             "glint": "#7d93b3",         # the brightest a glint of light gets
@@ -54,8 +55,8 @@ THEMES = {
             "body_glow": "#3a4560",
             "cloud": "#232c3e",
             "star": "#c8d2e6",
-            "trees": "#141b28",         # the far shore: kept close to the sky so it stays in the haze
-            "far_hill": "#1a2232",
+            "trees": "#0f1621",         # the far shore: kept soft so it stays in the haze
+            "far_hill": "#151d2b",
             "reed": "#202a2a",          # the framing: a touch of moonlight so it isn't lost in the dark
             "reed_head": "#312d2b",
             "branch": "#1a1c20",
@@ -64,7 +65,8 @@ THEMES = {
             "pad_edge": "#25312e",
             "flower": "#b9a8bc",
             "flower_middle": "#c9b465",
-            "halo": "#0c121c",          # the soft glow behind text, so it stands out from the scenery
+            "halo": "#0c121c",
+            "shadow": 0.12,             # moonlight casts only faint shadows          # the soft glow behind text, so it stands out from the scenery
         },
         "light": {
             "bg": "#b0c4d4",
@@ -77,6 +79,7 @@ THEMES = {
             "range_fill": "#74470a",
             "bar": (0, 0, 0, 25),
             "ripple": "#5f7890",
+            "ripple_light": "#4d657c",  # darker, not lighter: on an overcast day it reflects the pale sky, which vanishes on pale water
             "water_top": "#c5d5e2",
             "water_bottom": "#9db4c7",
             "glint": "#f4f8fb",
@@ -92,7 +95,7 @@ THEMES = {
             "body_glow": "#f3f1e6",
             "cloud": "#eef2f5",
             "trees": "#94a39d",
-            "far_hill": "#b7c4cc",
+            "far_hill": "#adbbc5",
             "reed": "#5d6e43",
             "reed_head": "#6e4c2f",
             "branch": "#4a3d32",
@@ -102,6 +105,7 @@ THEMES = {
             "flower": "#f3dbe6",
             "flower_middle": "#e8c860",
             "halo": "#d3dee8",
+            "shadow": 0.25,
         },
     },
 }
