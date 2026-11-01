@@ -12,7 +12,8 @@ from partials.backgrounds.helpers import make_jitter, wavy_line
 class WaterSurface(Layer):
     # Painted bands of color, lighter far away (top) and darker up close (bottom),
     # with soft wavy edges that boil, and a few glints of light drifting on top.
-    # The bands get thinner toward the top, following the scene's perspective
+    # The bands get thinner toward the top, following the scene's perspective.
+    # A storm (the scene's weather["storm"]) dims the light and churns the water
     #
     # Palette colors it uses (each falls back to "bg" if a theme doesn't have it):
     #   "water_top", "water_bottom"     the farthest and nearest band
@@ -34,6 +35,8 @@ class WaterSurface(Layer):
     GLINT_SPREAD = 0.6              # how much glints crowd toward the back (see Perspective.random_y)
     LIGHT = (0.35, 1.2)             # the light waxes and wanes between these: dull to bright glints
     LIGHT_TIME = (5000, 12000)      # milliseconds it takes to change
+    STORM_DIM = 0.55                # how much a full storm dims the light (0 = not at all, 1 = no glints)
+    STORM_ROUGH = 2.5               # how much faster the band edges churn in a full storm
 
     def __init__(self, scene):
         super().__init__(scene)
@@ -67,12 +70,13 @@ class WaterSurface(Layer):
         return edges
 
     def nudge_band_edges(self):
-        # Move every edge point a little, keeping it close to its band's line
+        # Move every edge point a little, keeping it close to its band's line. Rougher in a storm
+        jitter = self.BAND_JITTER * (1 + (self.STORM_ROUGH - 1) * self.scene.weather["storm"])
         for i, heights in enumerate(self.band_edges):
             base_y = self.band_lines[i + 1]
             wave = self.band_wave(i + 1)
             for j in range(len(heights)):
-                moved = heights[j] + wave * random.uniform(-self.BAND_JITTER, self.BAND_JITTER)
+                moved = heights[j] + wave * random.uniform(-jitter, jitter)
                 heights[j] = max(base_y - wave, min(base_y + wave, moved))
 
     def band_color(self, palette, index):
@@ -137,11 +141,12 @@ class WaterSurface(Layer):
 
         view = self.scene.view
         glint_color = pygame.Color(palette.get("glint", palette["bg"]))
+        light = self.light.value * (1 - self.STORM_DIM * self.scene.weather["storm"])
         for glint in self.glints:
             progress = glint["age"] / glint["lifetime"]
             # Fade in, hold, fade out: a soft bump that peaks in the middle
             bump = 1 - (2 * progress - 1) ** 2
-            strength = min(1, bump * self.GLINT_STRENGTH * self.light.value * view.clarity(glint["y"]))
+            strength = min(1, bump * self.GLINT_STRENGTH * light * view.clarity(glint["y"]) * self.scene.keep(glint["x"]))
             color = self.color_at(palette, glint["y"]).lerp(glint_color, strength)
             line = max(1, round(s(self.GLINT_WIDTH) * view.scale(glint["y"])))
 

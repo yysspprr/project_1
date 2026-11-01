@@ -36,8 +36,12 @@ def twig_shape():
 
 class FloatingDebris(Layer):
     # Leaves and twigs lying flat on the surface, seen through the scene's perspective.
-    # They drift with the wind, slowly turn one way and then the other, get pushed and
-    # bob when something lands close by, and now and then one sinks and a new one drifts in
+    # They drift with the wind (the scene's weather["wind"]), slowly turn one way and then
+    # the other, rock in a storm, and get pushed and bob when something lands close by.
+    # A drop that hits one dead on makes it dip and sends a ripple out from it
+    # (through on_ripple, so it doesn't need to know who draws ripples).
+    # Each casts a soft shadow on the water, soaks up water and darkens as it ages,
+    # and now and then one sinks and a new one drifts in
     #
     # Palette colors it uses:
     #   "leaves"        a list of leaf colors (falls back to "muted")
@@ -65,9 +69,17 @@ class FloatingDebris(Layer):
     BOB_DEPTH = 2                   # how far it dips, up close, in pixels
     JITTER = 0.06                   # outline wobble, as a share of its size
 
-    def __init__(self, scene):
+    HIT_BOB = 2.2                   # a drop landing right on it makes it bob this much harder
+    STORM_ROCK = 1.2                # how far it rocks in a full storm, up close, in pixels
+    SHADOW = (0.22, 0.12)           # how dark each of the two shadow steps is (0 = none, 1 = black)
+    SHADOW_OFFSET = (2, 4)          # how far down each step falls, up close, in pixels
+    SOAK = 0.4                      # how much darker it gets by the time it sinks
+    QUIET = 0.5                     # how much it fades behind the game's text (0 = not at all, 1 = like ripples)
+
+    def __init__(self, scene, on_ripple=None):
         super().__init__(scene)
-        self.wind = 1               # the background can change this; 1 is a normal breeze
+        self.on_ripple = on_ripple  # called as on_ripple(x, y, size=..., ...) to make a ripple
+        self.time = 0               # milliseconds since it started: keeps the rocking going
         self.items = []
         for i in range(self.COUNT):
             item = self.make_item(x=random.uniform(0, WIDTH))
@@ -105,6 +117,8 @@ class FloatingDebris(Layer):
             "push_y": 0,
             "kick": 0,                                                  # extra spin from a nearby drop
             "bob": self.BOB_TIME,                                       # not bobbing
+            "bob_size": 1,
+            "rock": random.uniform(0, 2 * math.pi),                     # where it is in its rocking
             "age": 0,
             "lifetime": random.randint(*self.LIFETIME),
         }
@@ -112,8 +126,10 @@ class FloatingDebris(Layer):
     # ---- Reacting to drops ----
 
     def nudge(self, x, y):
-        # Something landed at (x, y): push away whatever floats close by, and make it bob
+        # Something landed at (x, y): push away whatever floats close by, and make it bob.
+        # Returns True if it landed right on top of something
         view = self.scene.view
+        hit_any = False
         for item in self.items:
             size = view.scale(item["y"])
             reach = s(self.REACH) * size
@@ -121,13 +137,24 @@ class FloatingDebris(Layer):
             dx = item["x"] - x
             dy = (item["y"] - y) / view.flatten(item["y"])
             distance = math.hypot(dx, dy)
-            if distance < reach:
-                closeness = 1 - distance / reach
-                if distance > 0:
-                    item["push_x"] += dx / distance * s(self.PUSH) * size * closeness
-                    item["push_y"] += dy / distance * s(self.PUSH) * size * closeness * view.flatten(item["y"])
-                item["bob"] = 0
-                item["kick"] += random.uniform(-2, 2) * self.SPIN * closeness
+            if distance >= reach:
+                continue
+
+            closeness = 1 - distance / reach
+            item["bob"] = 0
+            item["bob_size"] = closeness
+            item["kick"] += random.uniform(-2, 2) * self.SPIN * closeness
+
+            if distance < item["length"] * size * 0.7 and self.presence(item) > 0.5:
+                # Dead on: it dips hard and the ripple starts from it, not from the drop
+                hit_any = True
+                item["bob_size"] = self.HIT_BOB
+                if self.on_ripple is not None:
+                    self.on_ripple(item["x"], item["y"], size=0.8, echoes=1, splash=False)
+            elif distance > 0:
+                item["push_x"] += dx / distance * s(self.PUSH) * size * closeness
+                item["push_y"] += dy / distance * s(self.PUSH) * size * closeness * view.flatten(item["y"])
+        return hit_any
 
     # ---- Layer methods ----
 
@@ -136,11 +163,14 @@ class FloatingDebris(Layer):
         seconds = dt / 1000
         slow_down = 0.5 ** (dt / self.PUSH_FADE)
 
+        self.time += dt
+        wind = self.scene.weather["wind"]
+
         for i, item in enumerate(self.items):
             size = view.scale(item["y"])
             item["spin"].update(dt)
             item["angle"] += (item["spin"].value + item["kick"]) * seconds
-            item["x"] += (s(self.DRIFT) * self.wind + item["wander"]) * size * seconds + item["push_x"] * seconds
+            item["x"] += (s(self.DRIFT) * wind + item["wander"]) * size * seconds + item["push_x"] * seconds
             item["y"] += item["push_y"] * seconds
             item["push_x"] *= slow_down
             item["push_y"] *= slow_down
@@ -170,52 +200,80 @@ class FloatingDebris(Layer):
         fade_out = (item["lifetime"] - item["age"]) / self.FADE_TIME
         return max(0, min(1, fade_in, fade_out))
 
-    def place(self, item, points, jitter=None):
-        # Turn the item's own shape into points on the screen:
-        # sized, turned, then squashed like everything lying on the surface
-        view = self.scene.view
-        size = item["length"] * view.scale(item["y"])
-        flatten = view.flatten(item["y"])
-        turn = math.radians(item["angle"])
-        cos, sin = math.cos(turn), math.sin(turn)
-
-        # A bob dips it down and back up
-        bob_y = 0
+    def bob_offset(self, item):
+        scale = self.scene.view.scale(item["y"])
+        offset = 0
         if item["bob"] < self.BOB_TIME:
             progress = item["bob"] / self.BOB_TIME
-            bob_y = math.sin(progress * math.pi * 2) * (1 - progress) * s(self.BOB_DEPTH) * view.scale(item["y"])
+            offset = math.sin(progress * math.pi * 2) * (1 - progress) * s(self.BOB_DEPTH) * item["bob_size"] * scale
+        rock = math.sin(self.time / 450 + item["rock"]) * s(self.STORM_ROCK) * self.scene.weather["storm"] * scale
+        return offset + rock
 
-        placed = []
-        for i, (u, v) in enumerate(points):
-            push = 1 + (jitter[i] if jitter else 0)
-            u, v = u * push, v * push
-            placed.append((item["x"] + (u * cos - v * sin) * size,
-                           item["y"] + bob_y + (u * sin + v * cos) * size * flatten))
-        return placed
+    def soak(self, item):
+        # 0 when fresh, 1 when it's about to sink: it darkens over the second half of its life
+        return max(0, (item["age"] / item["lifetime"] - 0.5) * 2)
+
+    def shifted(self, points, dy):
+        moved = []
+        for x, y in points:
+            moved.append((x, y + dy))
+        return moved
+
+    def place(self, item, points, jitter=None):
+        # Turn the item's own shape into points on the screen, lying on the surface,
+        # with its outline wobble, and dipped by any bobbing or rocking
+        if jitter:
+            pushed = []
+            for i, (u, v) in enumerate(points):
+                push = 1 + jitter[i]
+                pushed.append((u * push, v * push))
+            points = pushed
+        y = item["y"] + self.bob_offset(item)
+        return self.scene.view.lay_flat(points, item["x"], y, item["angle"], item["length"])
 
     def draw(self, surface, palette):
         view = self.scene.view
         leaf_colors = palette.get("leaves", [palette["muted"]])
         twig_color = pygame.Color(palette.get("twig", palette["muted"]))
+        black = pygame.Color(0, 0, 0)
 
         for item in self.items:
             water = self.scene.color_at(palette, item["y"])
-            strength = self.STRENGTH * view.clarity(item["y"]) * self.presence(item)
+            presence = self.presence(item) * self.scene.keep(item["x"], self.QUIET)
+            strength = self.STRENGTH * view.clarity(item["y"]) * presence
             if strength <= 0:
                 continue
-            line = max(1, round(s(self.LINE_WIDTH) * view.scale(item["y"])))
+            scale = view.scale(item["y"])
+            line = max(1, round(s(self.LINE_WIDTH) * scale))
 
             if item["twig"]:
-                color = water.lerp(twig_color, strength)
+                base = twig_color
+                shapes = []
                 for points in item["lines"]:
-                    pygame.draw.lines(surface, color, False, self.place(item, points), line)
+                    shapes.append(self.place(item, points))
+            else:
+                base = pygame.Color(leaf_colors[int(item["color_pick"] * len(leaf_colors))])
+                shapes = [self.place(item, item["outline"], item["jitter"])]
+            base = base.lerp(black, self.SOAK * self.soak(item))
+
+            # The shadow first, in two soft steps: the farther, fainter one underneath
+            for step in (1, 0):
+                shadow = water.lerp(black, self.SHADOW[step] * presence)
+                dy = s(self.SHADOW_OFFSET[step]) * scale * view.flatten(item["y"]) * 2
+                for points in shapes:
+                    if item["twig"]:
+                        pygame.draw.lines(surface, shadow, False, self.shifted(points, dy), line + 1)
+                    else:
+                        pygame.draw.polygon(surface, shadow, self.shifted(points, dy))
+
+            if item["twig"]:
+                color = water.lerp(base, strength)
+                for points in shapes:
+                    pygame.draw.lines(surface, color, False, points, line)
                 continue
 
-            base = pygame.Color(leaf_colors[int(item["color_pick"] * len(leaf_colors))])
             fill = water.lerp(base, strength)
-            edge = water.lerp(base.lerp(pygame.Color(0, 0, 0), self.OUTLINE), strength)
-
-            outline = self.place(item, item["outline"], item["jitter"])
-            pygame.draw.polygon(surface, fill, outline)
-            pygame.draw.lines(surface, edge, True, outline, line)
+            edge = water.lerp(base.lerp(black, self.OUTLINE), strength)
+            pygame.draw.polygon(surface, fill, shapes[0])
+            pygame.draw.lines(surface, edge, True, shapes[0], line)
             pygame.draw.lines(surface, edge, False, self.place(item, item["lines"][0]), line)

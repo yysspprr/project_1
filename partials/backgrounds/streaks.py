@@ -13,6 +13,7 @@ class FallingStreaks(Layer):
     # Each streak is aimed at a spot on the surface. It falls toward it, slanted a
     # little by the wind, and when it gets there it calls on_land(x, y), which is how
     # the rain background turns a landing drop into a ripple.
+    # The slant follows the scene's weather["wind"].
     # Falling distance, length and thickness all follow the scene's perspective
     #
     # Palette colors it uses:
@@ -29,7 +30,6 @@ class FallingStreaks(Layer):
     def __init__(self, scene, on_land=None):
         super().__init__(scene)
         self.on_land = on_land
-        self.wind = 1               # the background can change this; 1 is a normal breeze
         self.streaks = []
 
     def add(self, x, y):
@@ -42,7 +42,7 @@ class FallingStreaks(Layer):
             "fall": s(self.FALL_HEIGHT) * size,
             "length": s(random.randint(*self.LENGTH)) * size,
             "time": random.randint(*self.FALL_TIME),
-            "slant": self.WIND * self.wind,     # the wind when it started falling
+            "slant": self.WIND * self.scene.weather["wind"],     # the wind when it started falling
             "age": 0,
         })
 
@@ -75,7 +75,7 @@ class FallingStreaks(Layer):
 
             # Fade into what's behind it, a little stronger close to us
             water = self.scene.color_at(palette, head_y)
-            strength = self.STRENGTH * view.clarity(streak["y"])
+            strength = self.STRENGTH * view.clarity(streak["y"]) * self.scene.keep(head_x)
             front_color = water.lerp(rain_color, strength)
             back_color = water.lerp(rain_color, strength * self.TAIL)
             line = max(1, round(s(self.WIDTH) * streak["size"]))

@@ -45,16 +45,18 @@ THEMES = {
             "rain": "#a9bbd4",          # falling streaks
             "leaves": ["#6a7a46", "#8a6a3e", "#7a5f3a", "#5c6e4c"],     # floating leaves: one picked per leaf
             "twig": "#6c5a45",
+            "bug": "#05080d",           # water striders: mostly you see their dimples
+            "fish": "#0a0f17",          # a fish's back breaking the surface
         },
         "light": {
             "bg": "#b0c4d4",
             "text": "#253244",
-            "accent": "#8a560c",
+            "accent": "#74470a",
             "field": "#d3dee8",
             "muted": "#4b5b70",
             "overlay": (0, 0, 0, 100),
             "history_box": (0, 0, 0, 25),
-            "range_fill": "#8a560c",
+            "range_fill": "#74470a",
             "bar": (0, 0, 0, 25),
             "ripple": "#5f7890",
             "water_top": "#c5d5e2",
@@ -63,6 +65,8 @@ THEMES = {
             "rain": "#4f677e",
             "leaves": ["#7a8a4e", "#a27a42", "#8c6a3a", "#68805a"],
             "twig": "#6a563f",
+            "bug": "#26303c",
+            "fish": "#3e4c5a",
         },
     },
 }

@@ -7,12 +7,26 @@
 #   wobble()                    called on every wobble tick, for the hand-drawn boil
 #   draw(surface, palette)      paint itself
 #
+# The background keeps a shared weather report (self.weather), so layers can react
+# to the same conditions without knowing about each other:
+#   "storm"     0 = calm, 1 = as wild as it gets
+#   "wind"      1 = a normal breeze
+#
+# There's also a quiet zone: the column in the middle where the game's text and boxes sit.
+# Busy things fade there, so the game stays easy to read. Layers ask the background
+#   keep(x)             how much of something at x survives: 1 at the sides, QUIET in the middle
+#   keep(x, gentle)     the same, but only part of the way (gentle 0-1), for solid things
+#   margin_x()          a random spot at the sides, for things that should stay out of the way
+#
 # Layers and backgrounds can also own swells: numbers that slowly wax and wane
 # on their own (see Swell in helpers.py). Make them with self.swell(...);
 # they're kept moving for you, so just read .value when you need it
 
+import random
+
 import pygame
 
+from partials.config import WIDTH, CENTER_X, RANGE_BAR_SIZE, s
 from partials.backgrounds.perspective import Perspective
 from partials.backgrounds.helpers import Swell
 
@@ -52,9 +66,14 @@ class LayeredBackground(SwellOwner):
     # Runs a list of layers: the first one added is drawn first (at the back).
     # All layers share one perspective (self.view), so they agree on what's near and far
 
+    QUIET = 0.3                         # how much busy detail survives behind the game's text (0-1)
+    QUIET_WIDTH = RANGE_BAR_SIZE[0] // 2  # half the quiet column's width: the widest thing in the game
+    QUIET_FEATHER = s(40)               # its soft edges, so you can't see where it starts
+
     def __init__(self, view=None):
         self.layers = []
         self.view = view if view is not None else Perspective()
+        self.weather = {"storm": 0, "wind": 1}
 
     def add(self, layer):
         self.layers.append(layer)
@@ -73,6 +92,18 @@ class LayeredBackground(SwellOwner):
     def draw(self, surface, palette):
         for layer in self.layers:
             layer.draw(surface, palette)
+
+    def keep(self, x, gentle=1):
+        # How much of something at x survives the quiet zone
+        inside = (self.QUIET_WIDTH + self.QUIET_FEATHER - abs(x - CENTER_X)) / self.QUIET_FEATHER
+        inside = max(0, min(1, inside))
+        return 1 - (1 - self.QUIET) * inside * gentle
+
+    def margin_x(self):
+        # A random x in the left or right margin, outside the quiet zone
+        edge = CENTER_X - self.QUIET_WIDTH
+        x = random.uniform(0, max(edge, 1))
+        return x if random.random() < 0.5 else WIDTH - x
 
     def color_at(self, palette, y):
         # The color behind things at height y, so fading things can fade into it.

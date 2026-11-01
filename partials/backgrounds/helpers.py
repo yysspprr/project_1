@@ -93,7 +93,9 @@ def wavy_line(left, right, heights):
 
 
 def draw_wobbly_ring(surface, color, points, width):
-    # A closed outline through the points, with round joins so the corners don't show
+    # A closed outline through the points. Thick lines get round joins so the corners
+    # don't show; thin ones don't need them (and they cost a draw call per point)
     pygame.draw.lines(surface, color, True, points, width)
-    for point in points:
-        pygame.draw.circle(surface, color, point, width / 2)
+    if width >= 3:
+        for point in points:
+            pygame.draw.circle(surface, color, point, width / 2)

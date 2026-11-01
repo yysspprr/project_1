@@ -7,6 +7,8 @@
 #   - colors fade a little into the haze    (clarity)
 #   - evenly spaced rows look closer together
 
+import math
+
 import random
 
 from partials.config import HEIGHT
@@ -49,6 +51,20 @@ class Perspective:
         if random.random() < spread:
             return self.height_at(random.random())
         return random.uniform(0, HEIGHT)
+
+    def lay_flat(self, points, x, y, angle, size):
+        # Put a small shape lying on the surface at (x, y): its points (in its own
+        # units, around 0, 0) are sized, turned by angle degrees, then squashed
+        # like everything on the surface. size is in pixels up close
+        size = size * self.scale(y)
+        flatten = self.flatten(y)
+        turn = math.radians(angle)
+        cos, sin = math.cos(turn), math.sin(turn)
+        placed = []
+        for u, v in points:
+            placed.append((x + (u * cos - v * sin) * size,
+                           y + (u * sin + v * cos) * size * flatten))
+        return placed
 
     def rows(self, count):
         # Heights that split the window into count rows that are equally deep on the surface:

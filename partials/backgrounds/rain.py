@@ -8,6 +8,7 @@ from partials.backgrounds.helpers import Timer
 from partials.backgrounds.water import WaterSurface
 from partials.backgrounds.ripples import Ripples
 from partials.backgrounds.debris import FloatingDebris
+from partials.backgrounds.wildlife import WaterStriders, RisingFish
 from partials.backgrounds.streaks import FallingStreaks
 
 
@@ -21,28 +22,33 @@ class RainBackground(LayeredBackground):
     INTENSITY_TIME = (6000, 15000)
     WIND = (0.3, 2.0)               # 1 is a normal breeze: slants the rain and pushes the debris along
     WIND_TIME = (4000, 10000)
+    STORM_WIND = 0.6                # how much the rain drags the wind with it: 0 = not at all
 
     def __init__(self):
         super().__init__()
         self.intensity = self.swell(*self.INTENSITY, self.INTENSITY_TIME)
         self.wind = self.swell(*self.WIND, self.WIND_TIME)
 
-        # Back to front: debris floats on the water, the rain falls in front of it all
+        # Back to front: the water and what happens on it, then the rain falling in front of it all
         self.water = self.add(WaterSurface(self))
         self.ripples = self.add(Ripples(self))
-        self.debris = self.add(FloatingDebris(self))
+        self.fish = self.add(RisingFish(self, on_ripple=self.ripples.add))
+        self.debris = self.add(FloatingDebris(self, on_ripple=self.ripples.add))
+        self.striders = self.add(WaterStriders(self, on_ripple=self.ripples.add))
         self.rain = self.add(FallingStreaks(self, on_land=self.drop_landed))
 
         self.drop_timer = Timer(self.SPAWN_TIME)
 
     def drop_landed(self, x, y):
-        self.ripples.add(x, y)
-        self.debris.nudge(x, y)
+        # A drop on a leaf or twig makes it ripple instead; otherwise the water ripples
+        if not self.debris.nudge(x, y):
+            self.ripples.add(x, y)
 
     def update(self, dt):
-        # Share the wind before anything moves
-        self.rain.wind = self.wind.value
-        self.debris.wind = self.wind.value
+        # The weather report every layer reads: heavy rain is a storm, and drags the wind up with it
+        storm = self.intensity.share()
+        self.weather["storm"] = storm
+        self.weather["wind"] = self.wind.value * (1 - self.STORM_WIND / 2 + self.STORM_WIND * storm)
 
         super().update(dt)
 

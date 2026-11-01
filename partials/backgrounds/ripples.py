@@ -8,7 +8,7 @@ import pygame
 
 from partials.config import s
 from partials.backgrounds.base import Layer
-from partials.backgrounds.helpers import make_jitter, ellipse_points, draw_wobbly_ring
+from partials.backgrounds.helpers import make_jitter, ellipse_points
 
 
 class Ripples(Layer):
@@ -39,16 +39,24 @@ class Ripples(Layer):
         super().__init__(scene)
         self.ripples = []
 
-    def add(self, x, y):
-        # Start a new ripple at (x, y): called by whatever makes the drops
-        size = self.scene.view.scale(y)
+    def add(self, x, y, size=1, slow=1, strength=1, echoes=None, splash=True):
+        # Start a new ripple at (x, y): called by whatever disturbs the water.
+        # The extras make other kinds of ripple than a raindrop's:
+        #   size        how wide it grows, compared to a raindrop's
+        #   slow        how much longer it takes to spread and fade
+        #   strength    how strongly it shows
+        #   echoes      how many rings follow the first (None: a random number, like rain)
+        #   splash      whether droplets jump up where it starts
+        scale = self.scene.view.scale(y)
         self.ripples.append({
             "x": x,
             "y": y,
-            "size": size,
-            "radius": s(random.randint(*self.RADIUS)) * size,
-            "lifetime": random.randint(*self.LIFETIME),
-            "echoes": random.randint(*self.ECHOES),
+            "size": scale,
+            "radius": s(random.randint(*self.RADIUS)) * scale * size,
+            "lifetime": random.randint(*self.LIFETIME) * slow,
+            "echoes": random.randint(*self.ECHOES) if echoes is None else echoes,
+            "strength": strength,
+            "splash": splash,
             "age": 0,
             "jitter": make_jitter(self.POINTS, self.JITTER),
         })
@@ -74,17 +82,17 @@ class Ripples(Layer):
 
         for ripple in self.ripples:
             water = self.scene.color_at(palette, ripple["y"])     # fade into the water right under it
-            clarity = view.clarity(ripple["y"])
+            clarity = view.clarity(ripple["y"]) * self.scene.keep(ripple["x"])     # fainter far away and behind the game
             progress = ripple["age"] / ripple["lifetime"]       # 0 when it lands, 1 when it's gone
 
-            strength = clarity
+            strength = clarity * ripple["strength"]
             for ring in range(1 + ripple["echoes"]):
                 ring_progress = progress - ring * self.ECHO_DELAY
                 if ring_progress > 0:
                     self.draw_ring(surface, ripple, ring_progress, strength, water, ripple_color, light_color)
                 strength *= self.ECHO_STRENGTH
 
-            if ripple["age"] < self.SPLASH_TIME:
+            if ripple["splash"] and ripple["age"] < self.SPLASH_TIME:
                 self.draw_splash(surface, ripple, water, light_color, clarity)
 
     def draw_ring(self, surface, ripple, progress, strength, water, ripple_color, light_color):
@@ -101,12 +109,12 @@ class Ripples(Layer):
         far_color = water.lerp(light_color, fade)
 
         points = ellipse_points(ripple["x"], ripple["y"], radius_x, radius_y, ripple["jitter"])
-        draw_wobbly_ring(surface, near_color, points, line)
 
-        # The far half of the ring (the top half on screen) catches the light
+        # The near half of the ring (bottom on screen) is plain, the far half catches the light.
+        # Two open lines that share their end points, so the ring is closed
         half = len(points) // 2
-        far_half = points[half:] + points[:1]
-        pygame.draw.lines(surface, far_color, False, far_half, line)
+        pygame.draw.lines(surface, near_color, False, points[:half + 1], line)
+        pygame.draw.lines(surface, far_color, False, points[half:] + points[:1], line)
 
     def draw_splash(self, surface, ripple, water, light_color, clarity):
         # Three droplets hop up out of the water and fall back in
