@@ -56,6 +56,14 @@ THEMES = {
             "star": "#c8d2e6",
             "trees": "#141b28",         # the far shore: kept close to the sky so it stays in the haze
             "far_hill": "#1a2232",
+            "reed": "#202a2a",          # the framing: a touch of moonlight so it isn't lost in the dark
+            "reed_head": "#312d2b",
+            "branch": "#1a1c20",
+            "leaf": "#222f2d",
+            "pad": "#31423b",
+            "pad_edge": "#25312e",
+            "flower": "#b9a8bc",
+            "flower_middle": "#c9b465",
         },
         "light": {
             "bg": "#b0c4d4",
@@ -84,6 +92,14 @@ THEMES = {
             "cloud": "#eef2f5",
             "trees": "#94a39d",
             "far_hill": "#b7c4cc",
+            "reed": "#5d6e43",
+            "reed_head": "#6e4c2f",
+            "branch": "#4a3d32",
+            "leaf": "#6a7f4b",
+            "pad": "#6e8e55",
+            "pad_edge": "#4f6a3c",
+            "flower": "#f3dbe6",
+            "flower_middle": "#e8c860",
         },
     },
 }

@@ -14,6 +14,7 @@ from partials.backgrounds.ripples import Ripples
 from partials.backgrounds.debris import FloatingDebris
 from partials.backgrounds.wildlife import WaterStriders, RisingFish
 from partials.backgrounds.streaks import FallingStreaks
+from partials.backgrounds.framing import Reeds, Branch, LilyPads
 
 
 class RainBackground(LayeredBackground):
@@ -48,15 +49,23 @@ class RainBackground(LayeredBackground):
         self.shore = self.add(FarShore(self, sky=self.sky))
         self.ripples = self.add(Ripples(self))
         self.fish = self.add(RisingFish(self, on_ripple=self.ripples.add))
+        self.pads = self.add(LilyPads(self, side="left", on_ripple=self.ripples.add))
         self.debris = self.add(FloatingDebris(self, on_ripple=self.ripples.add))
         self.striders = self.add(WaterStriders(self, on_ripple=self.ripples.add))
         self.rain = self.add(FallingStreaks(self, on_land=self.drop_landed))
 
+        # Close to us, framing it all from the corners
+        self.branch = self.add(Branch(self, side="left", on_ripple=self.ripples.add))
+        self.reeds = self.add(Reeds(self, side="right"))
+        self.left_reeds = self.add(Reeds(self, side="left", size=0.8, count=0.7))     # a smaller clump, so the sides don't mirror
+
         self.drop_timer = Timer(self.SPAWN_TIME)
 
     def drop_landed(self, x, y):
-        # A drop on a leaf or twig makes it ripple instead; otherwise the water ripples
-        if not self.debris.nudge(x, y):
+        # A drop on a lily pad, leaf or twig makes that ripple instead; otherwise the water ripples
+        on_pad = self.pads.nudge(x, y)
+        on_debris = self.debris.nudge(x, y)
+        if not on_pad and not on_debris:
             self.ripples.add(x, y)
 
     def update(self, dt):
