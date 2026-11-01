@@ -7,7 +7,7 @@ import random
 
 import pygame
 
-from partials.config import WIDTH, s
+from partials.config import WIDTH, HEIGHT, s
 from partials.backgrounds.base import Layer
 
 
@@ -107,3 +107,77 @@ class Snowfall(Layer):
             if edge_color is not None and radius >= 2:
                 pygame.draw.circle(surface, behind.lerp(edge_color, strength * 0.7), (x, y), radius + 1)
             pygame.draw.circle(surface, behind.lerp(flake_color, strength), (x, y), radius)
+
+
+class DiamondDust(Layer):
+    # Tiny ice crystals floating in still, cold, sunny air: they hang and drift slowly with
+    # the wind, and now and then one catches the light and glints. Only when it's bright
+    # (the scene's weather["light"]) and not snowing (weather["storm"])
+    #
+    # Palette colors it uses:
+    #   "dust"          the crystals (no diamond dust without it)
+    #   "dust_edge"     an outline, so they show against a pale sky (optional)
+
+    COUNT = 40
+    DRIFT = 6                       # pixels per second sideways at a normal breeze
+    BOB = (2, 6)                    # how far they float up and down, in pixels
+    BOB_TIME = (3000, 7000)
+    TWINKLE = (900, 2600)           # milliseconds between glints of one crystal
+    STRENGTH = 0.85
+    QUIET = 0.7
+
+    def __init__(self, scene):
+        super().__init__(scene)
+        self.time = 0
+        self.crystals = []
+        for i in range(self.COUNT):
+            self.crystals.append({
+                "x": random.uniform(0, WIDTH),
+                "y": random.uniform(s(10), HEIGHT - s(60)),
+                "bob": s(random.uniform(*self.BOB)),
+                "bob_time": random.randint(*self.BOB_TIME),
+                "twinkle": random.randint(*self.TWINKLE),
+                "phase": random.uniform(0, 2 * math.pi),
+            })
+
+    def update(self, dt):
+        self.time += dt
+        drift = s(self.DRIFT) * self.scene.weather["wind"] * dt / 1000
+        for crystal in self.crystals:
+            crystal["x"] += drift
+            if crystal["x"] > WIDTH + s(4):
+                crystal["x"] = -s(4)
+                crystal["y"] = random.uniform(s(10), HEIGHT - s(60))
+
+    def draw(self, surface, palette):
+        if "dust" not in palette:
+            return
+        weather = self.scene.weather
+        show = max(0, min(1, weather["light"])) * (1 - weather["storm"]) ** 2
+        if show < 0.05:
+            return
+        dust = pygame.Color(palette["dust"])
+        edge = pygame.Color(palette["dust_edge"]) if "dust_edge" in palette else None
+        for crystal in self.crystals:
+            # Mostly faint, with a short sharp glint once per twinkle
+            wave = math.sin(self.time / crystal["twinkle"] * 2 * math.pi + crystal["phase"])
+            glint = max(0, wave) ** 8
+            strength = self.STRENGTH * show * (0.25 + 0.75 * glint) * self.scene.keep(crystal["x"], self.QUIET)
+            if strength < 0.05:
+                continue
+            y = crystal["y"] + math.sin(self.time / crystal["bob_time"] * 2 * math.pi + crystal["phase"]) * crystal["bob"]
+            behind = self.scene.color_at(palette, y)
+            x = crystal["x"]
+            if edge is not None:
+                pygame.draw.circle(surface, behind.lerp(edge, min(1, strength * 0.7)), (x, y), 1.5)
+            if glint > 0.6:
+                # The glint: a tiny four-pointed star
+                arm = s(2.5)
+                if edge is not None:
+                    shade = behind.lerp(edge, min(1, strength * 0.7))
+                    pygame.draw.line(surface, shade, (x - arm - 1, y), (x + arm + 1, y), 3)
+                    pygame.draw.line(surface, shade, (x, y - arm - 1), (x, y + arm + 1), 3)
+                color = behind.lerp(dust, min(1, strength))
+                pygame.draw.line(surface, color, (x - arm, y), (x + arm, y))
+                pygame.draw.line(surface, color, (x, y - arm), (x, y + arm))
+            surface.set_at((int(x), int(y)), behind.lerp(dust, min(1, strength)))

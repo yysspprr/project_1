@@ -140,6 +140,9 @@ THEMES = {
             "ice_rim": "#36425c",
             "ice_crack": "#4a5874",
             "flake": "#d6e0ef",
+            "aurora_low": "#44d8a4",    # the northern lights: green at the bottom...
+            "aurora_high": "#7a62d0",   # ... fading to violet at the top
+            "sparkle": "#c3d2ea",       # moonlight glinting on the snow
             "halo": "#121a29",
             "shadow": 0.12,
         },
@@ -173,6 +176,10 @@ THEMES = {
             "ice_crack": "#dbe6ee",
             "flake": "#ffffff",
             "flake_edge": "#9fb1c4",    # so flakes show against the pale sky
+            "sparkle": "#ffffff",
+            "sparkle_edge": "#9fb4c8",  # a blue-grey edge so white glints show on pale snow
+            "dust": "#ffffff",          # diamond dust: tiny ice crystals glinting in the sunny air
+            "dust_edge": "#a9bccf",
             "halo": "#e3eaf1",
             "shadow": 0.25,
         },

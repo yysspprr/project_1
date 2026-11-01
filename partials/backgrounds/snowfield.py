@@ -131,8 +131,9 @@ class SnowField(Layer):
 class FrozenPond(Layer):
     # An ice-covered pond lying in the snow, right behind the game: smooth and calm, which
     # makes it a quiet backdrop for the text. A rim of snow around its edge, a few cracks,
-    # and patches of snow dusted over the ice. Other layers can draw reflections on it,
-    # using inside() to stay on the ice
+    # and patches of snow dusted over the ice. It can show soft reflections of things in
+    # the sky: give it mirrors, layers with a reflection() image (and a version number
+    # that goes up when it changes), like the aurora
     #
     # Palette colors it uses:
     #   "ice_far", "ice_near"       the ice, at its far and near edge
@@ -146,9 +147,13 @@ class FrozenPond(Layer):
     RIM = 3                         # rim thickness, up close in pixels
     CRACKS = 4
     DUST = 5                        # patches of snow on the ice
+    REFLECT = 0.45                  # how strongly the ice shows reflections (0 = not at all)
 
-    def __init__(self, scene):
+    def __init__(self, scene, mirrors=()):
         super().__init__(scene)
+        self.mirrors = list(mirrors)
+        self.reflections = {}       # each mirror's reflection, fitted to the ice: (its version, image)
+        self.paints = 0             # goes up whenever the ice is repainted, so reflections get re-cut
         view = scene.view
         self.center_y = view.horizon + (HEIGHT - view.horizon) * self.DEPTH
         self.half_w = WIDTH * self.WIDTH_SHARE / 2
@@ -251,8 +256,26 @@ class FrozenPond(Layer):
             pygame.draw.circle(ice, rim, point, thickness / 2)
 
         self.image = ice
+        self.cutout = cutout
         self.image_at = (left, top)
         self.painted_palette = palette
+        self.paints += 1
+
+    def fitted_reflection(self, mirror):
+        # The mirror's reflection squeezed onto the ice and cut to the pond's shape,
+        # made again only when the mirror or the ice has changed
+        image = mirror.reflection()
+        if image is None:
+            return None
+        key = (mirror.version, self.paints)
+        cached = self.reflections.get(id(mirror))
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        fitted = pygame.transform.scale(image, self.cutout.get_size())
+        fitted.blit(self.cutout, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+        fitted.set_alpha(int(255 * self.REFLECT))
+        self.reflections[id(mirror)] = (key, fitted)
+        return fitted
 
     def wobble(self):
         self.jitter = make_jitter(self.POINTS, self.JITTER)
@@ -262,3 +285,84 @@ class FrozenPond(Layer):
         if self.image is None or self.painted_palette is not palette:
             self.paint(palette)
         surface.blit(self.image, self.image_at)
+        for mirror in self.mirrors:
+            reflection = self.fitted_reflection(mirror)
+            if reflection is not None:
+                surface.blit(reflection, self.image_at)
+
+
+class SnowSparkle(Layer):
+    # Tiny glints flashing for a moment here and there on the snow, where a crystal
+    # catches the light. More of them, and brighter, when the light is strong (the scene's
+    # weather["light"]); hidden by falling snow. The bigger ones close to us flash as a
+    # little cross
+    #
+    # Palette colors it uses:
+    #   "sparkle"       the glints (no sparkle without it)
+    #   "sparkle_edge"  an outline, so white glints show on pale snow (optional)
+
+    COUNT = 45                      # glints alive at once
+    LIFE = (250, 800)               # milliseconds from flash to gone
+    WAIT = (0, 2500)                # milliseconds a spot waits before its next flash
+    SPREAD = 0.35                   # how much they crowd toward the back (see Perspective.random_y)
+    CROSS = 0.55                    # glints bigger than this (perspective size) flash as a cross
+    STRENGTH = 0.9
+    QUIET = 0.7                     # how much they fade behind the game's text
+
+    def __init__(self, scene, avoid=None):
+        super().__init__(scene)
+        self.avoid = avoid          # something with inside(x, y) to keep off, like the pond (optional)
+        self.glints = []
+        for i in range(self.COUNT):
+            glint = self.make_glint()
+            glint["age"] = random.randint(-self.WAIT[1], glint["life"])
+            self.glints.append(glint)
+
+    def make_glint(self):
+        view = self.scene.view
+        for attempt in range(6):
+            x = random.uniform(0, WIDTH)
+            y = view.random_y(self.SPREAD)
+            if self.avoid is None or not self.avoid.inside(x, y, 1.05):
+                break
+        return {"x": x, "y": y, "life": random.randint(*self.LIFE),
+                "age": -random.randint(*self.WAIT), "scale": view.scale(y)}
+
+    def update(self, dt):
+        for i, glint in enumerate(self.glints):
+            glint["age"] += dt
+            if glint["age"] >= glint["life"]:
+                self.glints[i] = self.make_glint()
+
+    def draw(self, surface, palette):
+        if "sparkle" not in palette:
+            return
+        sparkle = pygame.Color(palette["sparkle"])
+        edge = pygame.Color(palette["sparkle_edge"]) if "sparkle_edge" in palette else None
+        weather = self.scene.weather
+        light = max(0, min(1, weather["light"])) * (1 - weather["storm"])
+        if light < 0.05:
+            return
+        for glint in self.glints:
+            if glint["age"] < 0:
+                continue
+            progress = glint["age"] / glint["life"]
+            flash = 1 - abs(2 * progress - 1)               # up quickly, down quickly
+            strength = self.STRENGTH * flash * light * self.scene.keep(glint["x"], self.QUIET)
+            if strength < 0.05:
+                continue
+            behind = self.scene.color_at(palette, glint["y"])
+            color = behind.lerp(sparkle, min(1, strength))
+            x, y = glint["x"], glint["y"]
+            if glint["scale"] > self.CROSS and flash > 0.5:
+                arm = s(2.5) * glint["scale"]
+                if edge is not None:
+                    shade = behind.lerp(edge, min(1, strength * 0.8))
+                    pygame.draw.line(surface, shade, (x - arm - 1, y), (x + arm + 1, y), 3)
+                    pygame.draw.line(surface, shade, (x, y - arm * 0.7 - 1), (x, y + arm * 0.7 + 1), 3)
+                pygame.draw.line(surface, color, (x - arm, y), (x + arm, y))
+                pygame.draw.line(surface, color, (x, y - arm * 0.7), (x, y + arm * 0.7))
+            else:
+                if edge is not None:
+                    pygame.draw.circle(surface, behind.lerp(edge, min(1, strength * 0.8)), (x, y), 1.5)
+                surface.set_at((int(x), int(y)), color)

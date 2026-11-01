@@ -6,8 +6,9 @@ from partials.backgrounds.base import LayeredBackground
 from partials.backgrounds.perspective import Perspective
 from partials.backgrounds.sky import Sky
 from partials.backgrounds.mountains import SnowyRange
-from partials.backgrounds.snowfield import SnowField, FrozenPond
-from partials.backgrounds.flakes import Snowfall
+from partials.backgrounds.snowfield import SnowField, FrozenPond, SnowSparkle
+from partials.backgrounds.flakes import Snowfall, DiamondDust
+from partials.backgrounds.aurora import Aurora
 
 
 class SnowBackground(LayeredBackground):
@@ -33,12 +34,16 @@ class SnowBackground(LayeredBackground):
         self.light = self.swell(*self.LIGHT, self.LIGHT_TIME)
         self.update_weather()
 
-        # Back to front: sky, the mountains on the horizon, the snowy ground, the pond, falling snow
+        # Back to front: sky and aurora, the mountains on the horizon, the snowy ground and
+        # its sparkle, the pond (reflecting the aurora), then falling snow and diamond dust
         self.sky = self.add(Sky(self))
+        self.aurora = self.add(Aurora(self))
         self.range = self.add(SnowyRange(self))
         self.ground = self.add(SnowField(self))
-        self.pond = self.add(FrozenPond(self))
+        self.pond = self.add(FrozenPond(self, mirrors=[self.aurora]))
+        self.sparkle = self.add(SnowSparkle(self, avoid=self.pond))
         self.flakes = self.add(Snowfall(self))
+        self.dust = self.add(DiamondDust(self))
 
     def update_weather(self):
         # The weather report every layer reads: heavy snow is a storm
