@@ -63,6 +63,15 @@ class SnowField(Layer):
     def wave(self, index):
         return s(self.WAVE) * self.scene.view.scale(self.lines[index])
 
+    def crest_y(self, crest, x):
+        # The height of a drift's crest (0 = the furthest one) at x, so things can sit on it
+        heights = self.crests[crest]
+        spot = max(0, min(len(heights) - 1, x / WIDTH * (len(heights) - 1)))
+        left = int(spot)
+        right = min(left + 1, len(heights) - 1)
+        share = spot - left
+        return heights[left] + (heights[right] - heights[left]) * share
+
     def band_color(self, palette, index):
         top = pygame.Color(palette.get("snow_top", palette["bg"]))
         bottom = pygame.Color(palette.get("snow_bottom", palette["bg"]))
@@ -366,3 +375,93 @@ class SnowSparkle(Layer):
                 if edge is not None:
                     pygame.draw.circle(surface, behind.lerp(edge, min(1, strength * 0.8)), (x, y), 1.5)
                 surface.set_at((int(x), int(y)), color)
+
+
+
+class SnowGusts(Layer):
+    # Loose snow lifted off the crest of a drift when a gust blows through (the scene's
+    # weather["gust"], 0 to 1): a streamer of fine snow rises off the crest, curls downwind
+    # and settles away. Mostly at the sides, so it doesn't sweep across the game's text
+    #
+    # Palette colors it uses:
+    #   "snow_lit"      the lifted snow (falls back to "snow_top")
+    #   "flake_edge"    an outline, so it shows against pale snow (optional)
+
+    STREAMERS = (2, 3)              # how many streamers of snow one gust lifts
+    FROM_CREST = 0.35               # share of them that come off a drift's crest; the rest off the snow up close
+    NEAR = (0.02, 0.15)             # how far away the close ones are (0 = right in front of us, 1 = horizon)
+    GRAINS = 40                     # grains of snow in one streamer
+    SPREAD = 26                     # how long a stretch of crest it comes off, in pixels up close
+    RISE = (18, 42)                 # how fast grains lift, pixels per second up close
+    BLOW = (45, 95)                 # how fast they blow downwind at a normal breeze
+    SWIRL = 9                       # how far they curl up and down, in pixels up close
+    LIFE = (900, 1700)
+    SIZE = 2.2                      # grain radius up close
+    STRENGTH = 0.8
+    QUIET = 0.8                     # how much they fade behind the game's text
+
+    def __init__(self, ground):
+        super().__init__(ground.scene)
+        self.ground = ground
+        self.grains = []
+        self.gusting = False
+
+    def lift(self):
+        # Start a streamer or two off the crests of the nearer drifts
+        view = self.scene.view
+        crests = len(self.ground.crests)
+        for i in range(random.randint(*self.STREAMERS)):
+            x = self.scene.margin_x()
+            if random.random() < self.FROM_CREST:
+                # Off the crest of one of the further drifts
+                crest = random.randrange(max(0, crests - 3), crests)
+                ground_at = lambda gx, crest=crest: self.ground.crest_y(crest, gx)
+            else:
+                # Off the open snow close to us, where the grains are bigger
+                near_y = view.height_at(random.uniform(*self.NEAR))
+                ground_at = lambda gx, near_y=near_y: near_y
+            scale = view.scale(ground_at(x))
+            for k in range(self.GRAINS):
+                gx = x + random.uniform(-0.5, 0.5) * s(self.SPREAD) * scale
+                self.grains.append({
+                    "x": gx, "y": ground_at(gx) - random.uniform(0, 3) * scale, "scale": scale,
+                    "rise": s(random.uniform(*self.RISE)) * scale,
+                    "blow": s(random.uniform(*self.BLOW)) * scale,
+                    "phase": random.uniform(0, 2 * math.pi),
+                    "age": -random.randint(0, 500),                 # they come off over half a second
+                    "life": random.randint(*self.LIFE),
+                })
+
+    def update(self, dt):
+        gust = self.scene.weather.get("gust", 0)
+        if gust > 0.5 and not self.gusting:
+            self.lift()
+        self.gusting = gust > 0.5
+
+        seconds = dt / 1000
+        wind = self.scene.weather["wind"]
+        for grain in self.grains:
+            grain["age"] += dt
+            if grain["age"] < 0:
+                continue
+            share = grain["age"] / grain["life"]
+            grain["x"] += grain["blow"] * wind * seconds
+            grain["y"] -= grain["rise"] * (1 - share * 1.6) * seconds      # up, then settling back down
+        self.grains = [grain for grain in self.grains if grain["age"] < grain["life"]]
+
+    def draw(self, surface, palette):
+        snow = pygame.Color(palette.get("snow_lit", palette.get("snow_top", palette["bg"])))
+        edge = pygame.Color(palette["flake_edge"]) if "flake_edge" in palette else None
+        for grain in self.grains:
+            if grain["age"] < 0:
+                continue
+            share = grain["age"] / grain["life"]
+            strength = self.STRENGTH * math.sin(math.pi * share) * self.scene.keep(grain["x"], self.QUIET)
+            if strength < 0.05:
+                continue
+            y = grain["y"] + math.sin(share * 6 + grain["phase"]) * s(self.SWIRL) * grain["scale"] * share
+            behind = self.scene.color_at(palette, y)
+            radius = max(1, s(self.SIZE) * grain["scale"])
+            if edge is not None:
+                pygame.draw.circle(surface, behind.lerp(edge, strength * 0.9), (grain["x"], y), radius + 1)
+            pygame.draw.circle(surface, behind.lerp(snow, strength), (grain["x"], y), radius)

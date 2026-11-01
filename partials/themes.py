@@ -156,6 +156,10 @@ THEMES = {
             "bird": "owl",              # an owl keeps watch at night...
             "owl_body": "#3a3029",
             "owl_eye": "#f0c860",
+            "fox": "#7a4a2c",           # a fox, hunting mice under the snow
+            "fox_light": "#b9b4ab",
+            "fox_dark": "#1a120e",
+            "sleigh": "#04060b",        # a very rare December visitor, dark against the moon
             "halo": "#121a29",
             "shadow": 0.2,
         },
@@ -206,6 +210,9 @@ THEMES = {
             "bird": "robin",            # ... and a robin by day
             "robin_body": "#6b5a4c",
             "robin_breast": "#d4663a",
+            "fox": "#c8642c",
+            "fox_light": "#f4efe6",
+            "fox_dark": "#2a1d17",
             "halo": "#e3eaf1",
             "shadow": 0.45,
         },
