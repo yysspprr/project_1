@@ -62,6 +62,16 @@ class Swell:
         return (self.value - self.low) / (self.high - self.low)
 
 
+def vertical_gradient(width, height, color_at_share):
+    # An image fading from top to bottom: color_at_share(0..1) gives each row's color.
+    # Painted one pixel wide and stretched sideways, which is far quicker than drawing every row
+    height = max(1, int(height))
+    strip = pygame.Surface((1, height), pygame.SRCALPHA)
+    for y in range(height):
+        strip.set_at((0, y), color_at_share(y / max(height - 1, 1)))
+    return pygame.transform.scale(strip, (max(1, int(width)), height))
+
+
 def make_jitter(count, amount):
     # A small random push in or out for each of count points
     jitter = []

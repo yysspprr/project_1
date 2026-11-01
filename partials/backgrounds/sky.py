@@ -52,7 +52,8 @@ class Sky(Layer):
         margin = CENTER_X - scene.QUIET_WIDTH
         self.body_x = WIDTH - margin / 2
         self.body_y = self.horizon * self.BODY_HEIGHT
-        scene.weather["light_x"] = self.body_x      # so the water knows where to put its reflection
+        scene.weather["light_x"] = self.body_x      # so the water knows where to put its reflection,
+        scene.weather["light_y"] = self.body_y      # and shadows know which way to fall
 
         self.stars = []
         for i in range(self.STARS):

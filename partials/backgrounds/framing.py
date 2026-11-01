@@ -16,13 +16,19 @@ from partials.backgrounds.helpers import Swell, make_jitter
 class Reeds(Layer):
     # A clump of reeds and grass in a bottom corner. They sway in the wind (the scene's
     # weather["wind"]), bend further when it blows harder, and flinch now and then in
-    # heavy rain as drops hit them. Some have a cattail at the top. Each casts a soft
-    # shadow on the water, stronger when the light is bright (the scene's weather["light"])
+    # heavy rain as drops hit them. Some have a cattail at the top. Each grows out of the
+    # water a little above the bottom of the window, with a faint ring where it meets the
+    # water, and casts a shadow that lies flat on the water. Its direction comes from where
+    # the sun or moon is (the scene's weather["light_x"] and ["light_y"]): in perspective,
+    # shadows on the water all point away from the spot on the horizon right below the light,
+    # and the lower the light, the longer they are. Stronger when the light is bright
+    # (the scene's weather["light"])
     #
     # Palette colors and values it uses:
     #   "reed"          stems and blades (falls back to "muted")
     #   "reed_head"     the cattails (falls back to "reed")
     #   "shadow"        how dark shadows are in this light, 0-1 (falls back to SHADOW)
+    #   "ripple"        the ring around each stem's base
 
     STEMS = 9
     BLADES = 12                     # thinner grass in front of the stems
@@ -42,8 +48,13 @@ class Reeds(Layer):
     FLINCH_RATE = 1.2               # flinches per second for each stem, in a full storm
     FLINCH_FADE = 250               # milliseconds for a flinch to halve
     JITTER = 0.5                    # outline wobble, in pixels
+    ROOT = (34, 72)                 # how far above the bottom of the window the stems come out of the water,
+                                    # high enough that their shadows have room to show
     SHADOW = 0.25                   # how dark the shadow is in full light (0 = none, 1 = black)
-    SHADOW_OFFSET = (-4, 3)         # which way it falls: away from the sun, up in the right of the sky
+    CAST_LENGTH = 0.45              # shadow length, in stem heights, with the light 60% of the way up the sky
+    CAST = (-0.6, 0.22)             # without a sun or moon: the shadow of a point h pixels up the stem
+                                    # lands this many h's sideways and down from the base
+    RING = (5, 1.6)                 # half the width and height of the ring at each stem's base
 
     def __init__(self, scene, side="right", size=1, count=1):
         # size: how tall and wide the clump is, compared to normal
@@ -58,10 +69,12 @@ class Reeds(Layer):
             self.stems.append(self.make_stem(self.STEM_HEIGHT, self.STEM_WIDTH, random.random() < self.CATTAILS))
         for i in range(round(self.BLADES * count)):
             self.stems.append(self.make_stem(self.BLADE_HEIGHT, self.BLADE_WIDTH, False))
+        self.stems.sort(key=lambda stem: stem["base"])      # further back first, so nearer ones overlap them
 
     def make_stem(self, heights, width, cattail):
         return {
             "x": self.corner_x + self.side * s(random.uniform(-5, self.SPREAD * self.size)),
+            "base": HEIGHT - s(random.uniform(*self.ROOT) * self.size),
             "height": s(random.randint(*heights) * self.size),
             "lean": s(random.uniform(*self.LEAN)),
             "width": s(width),
@@ -86,7 +99,7 @@ class Reeds(Layer):
             stem["jitter"] = make_jitter(self.POINTS, self.JITTER)
 
     def stem_points(self, stem):
-        # From the bottom of the window up, curving more toward the top
+        # From where it comes out of the water up, curving more toward the top
         wind = self.scene.weather["wind"]
         sway = math.sin(self.time / stem["period"] * 2 * math.pi + stem["phase"]) * s(self.SWAY) * wind
         # The wind blows the same way as the rain slants: toward the right
@@ -95,12 +108,40 @@ class Reeds(Layer):
         for i in range(self.POINTS):
             t = i / (self.POINTS - 1)
             points.append((stem["x"] + top_shift * t * t + stem["jitter"][i],
-                           HEIGHT + s(4) - stem["height"] * t))
+                           stem["base"] - stem["height"] * t))
         return points
 
-    def draw_stem(self, surface, stem, points, reed, head, shift=(0, 0)):
-        if shift != (0, 0):
-            points = [(x + shift[0], y + shift[1]) for x, y in points]
+    def cast_direction(self, base_x, base_y):
+        # How far sideways and down the shadow of one pixel of stem falls
+        weather = self.scene.weather
+        light_x = weather.get("light_x")
+        light_y = weather.get("light_y")
+        horizon = self.scene.view.horizon
+        if light_x is None or light_y is None or horizon <= 0:
+            return self.CAST
+
+        # Away from the point on the horizon right below the light
+        away_x = base_x - light_x
+        away_y = base_y - horizon
+        distance = math.hypot(away_x, away_y) or 1
+
+        # Higher in the sky: shorter shadows
+        height = max(0.15, (horizon - light_y) / horizon)
+        length = self.CAST_LENGTH * 0.6 / height
+        return (away_x / distance * length, away_y / distance * length)
+
+    def cast(self, stem, points):
+        # The stem's shadow, lying flat on the water: each point lands further from the base
+        # the higher up the stem it is, in the direction away from the light
+        base_x, base_y = points[0]
+        along_x, along_y = self.cast_direction(base_x, base_y)
+        shadow = []
+        for x, y in points:
+            up = base_y - y
+            shadow.append((x + up * along_x, base_y + up * along_y))
+        return shadow
+
+    def draw_stem(self, surface, stem, points, reed, head):
         pygame.draw.lines(surface, reed, False, points, stem["width"])
         if stem["cattail"]:
             # A fat rounded head just below the tip
@@ -118,14 +159,19 @@ class Reeds(Layer):
         # Shadows first, all of them, so no shadow falls on top of another reed
         darkness = palette.get("shadow", self.SHADOW) * max(0, min(1, self.scene.weather["light"]))
         if darkness > 0.01:
-            shift = (s(self.SHADOW_OFFSET[0]), s(self.SHADOW_OFFSET[1]))
             black = pygame.Color(0, 0, 0)
             for stem, points in zip(self.stems, all_points):
-                water = self.scene.color_at(palette, points[len(points) // 2][1])
+                water = self.scene.color_at(palette, stem["base"])
                 shade = water.lerp(black, darkness)
-                self.draw_stem(surface, stem, points, shade, shade, shift)
+                self.draw_stem(surface, stem, self.cast(stem, points), shade, shade)
 
+        ripple = pygame.Color(palette.get("ripple", palette["muted"]))
         for stem, points in zip(self.stems, all_points):
+            # A faint ring where the stem meets the water, then the stem itself
+            water = self.scene.color_at(palette, stem["base"])
+            x, y = points[0]
+            half_w, half_h = s(self.RING[0]), s(self.RING[1])
+            pygame.draw.ellipse(surface, water.lerp(ripple, 0.6), (x - half_w, y - half_h, half_w * 2, half_h * 2), 1)
             self.draw_stem(surface, stem, points, reed, head)
 
 

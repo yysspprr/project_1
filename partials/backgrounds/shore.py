@@ -40,12 +40,17 @@ class FarShore(Layer):
     CLOUD_SQUASH = 0.45             # the reflections are flatter than the clouds
     CLOUD_DEPTH = 0.8               # how far below the horizon they land, compared to how high the cloud is
 
-    BODY_REFLECT = 0.75             # how strongly the sun or moon shows in the water
-    BODY_GLOW_REFLECT = 0.45        # ... and its glow
-    BODY_SQUASH = 0.8               # its reflection is a little flatter than the real thing
-    BODY_STRIP = (1.5, 3)           # the reflection is broken into strips this tall, in pixels
-    BODY_STRIP_GAP = (0.6, 1.4)
-    BODY_SHIFT = 2.5                # how far each strip slides sideways
+    # The sun or moon on rippled water: not a neat mirror image, but a long column of
+    # broken bands stretching toward us, narrower and fainter the further it reaches
+    BODY_REFLECT = 0.8              # how strongly the bands show right under the sun or moon
+    BODY_GLOW_REFLECT = 0.4         # how strongly its glow shows in the water
+    BODY_LENGTH = 9                 # how far the column reaches, in sun or moon radii
+    BODY_TAPER = 0.3                # how wide the bands are at the far end, compared to the start
+    BODY_BAND = (1, 2.5)            # how tall each band is, in pixels
+    BODY_BAND_GAP = (1.2, 3)        # the gaps between bands; they grow further down
+    BODY_SHIFT = (2, 7)             # how far bands slide sideways: at the top, at the far end
+    BODY_SPLIT = 0.4                # chance a band is broken into two pieces
+    BODY_GLOW_STRETCH = 2.2         # the glow's reflection is this many times taller than the glow
 
     STAR_REFLECT = 0.55             # how strongly the stars show in the water
     STAR_DEPTH = 0.85               # how far below the horizon they land, compared to how high the star is
@@ -168,13 +173,25 @@ class FarShore(Layer):
         return made
 
     def shake_reflections(self):
-        # New breaks in the sun or moon's reflection, and new shimmer for the stars
+        # New breaks in the sun or moon's reflection, and new shimmer for the stars.
+        # Each band piece: how far down the column it is (0-1), its height, its sideways
+        # shift (as a share of the most it can move there) and its width (as a share of the most)
         self.body_strips = []
-        y = 0
-        while y < s(40):
-            tall = random.uniform(*self.BODY_STRIP)
-            self.body_strips.append((y, tall, random.uniform(-1, 1) * self.BODY_SHIFT))
-            y += tall + random.uniform(*self.BODY_STRIP_GAP)
+        if self.sky is not None:
+            length = s(self.sky.BODY_SIZE) * self.BODY_LENGTH
+            y = 0
+            while y < length:
+                share = y / length
+                tall = random.uniform(*self.BODY_BAND)
+                shift = random.uniform(-1, 1)
+                width = random.uniform(0.3, 1)
+                if random.random() < self.BODY_SPLIT:
+                    # Broken in two: a piece either side, with a gap in the middle
+                    self.body_strips.append((share, tall, shift - width * 0.6, width * 0.45))
+                    self.body_strips.append((share, tall, shift + width * 0.6, width * 0.35))
+                else:
+                    self.body_strips.append((share, tall, shift, width))
+                y += tall + random.uniform(*self.BODY_BAND_GAP) * (1 + share * 1.5)
         count = len(self.sky.stars) if self.sky is not None else 0
         self.star_shimmer = []
         for i in range(count):
@@ -182,27 +199,31 @@ class FarShore(Layer):
             self.star_shimmer.append(None if broken else random.uniform(-1, 1) * self.STAR_SHIMMER)
 
     def draw_body_reflection(self, surface, palette, clear):
-        # The sun or moon mirrored below the horizon, broken into strips, over its reflected glow
+        # The sun or moon's reflection: its glow stretched long, with a column of broken
+        # bands on top, starting where the mirror image of the sun or moon would be
         sky = self.sky
         light = max(0, min(1, self.scene.weather["light"]))
-        y = self.horizon + (self.horizon - sky.body_y) * self.CLOUD_DEPTH
+        radius = s(sky.BODY_SIZE)
+        length = radius * self.BODY_LENGTH
+        mirror_y = self.horizon + (self.horizon - sky.body_y) * self.CLOUD_DEPTH
+        top = mirror_y - radius * 0.6
 
         if sky.glow_image is not None:
-            glow = self.reflected(sky.glow_image, self.BODY_SQUASH, self.body_images)
+            glow = self.reflected(sky.glow_image, self.BODY_GLOW_STRETCH, self.body_images)
             glow.set_alpha(int(255 * self.BODY_GLOW_REFLECT * light * clear))
-            surface.blit(glow, glow.get_rect(center=(sky.body_x, y)))
+            surface.blit(glow, glow.get_rect(center=(sky.body_x, top + length * 0.3)))
 
-        if sky.disc is None:
-            return
-        disc = self.reflected(sky.disc, self.BODY_SQUASH, self.body_images)
-        disc.set_alpha(int(255 * self.BODY_REFLECT * clear))
-        left = sky.body_x - disc.get_width() / 2
-        top = y - disc.get_height() / 2
-        for strip_top, tall, shift in self.body_strips:
-            if strip_top >= disc.get_height():
-                break
-            area = pygame.Rect(0, int(strip_top), disc.get_width(), max(1, round(tall)))
-            surface.blit(disc, (left + shift, top + int(strip_top)), area)
+        body = pygame.Color(palette["body"])
+        for share, tall, shift, width in self.body_strips:
+            y = top + share * length
+            fade = 1 - 0.75 * share
+            strength = self.BODY_REFLECT * fade * (0.5 + 0.5 * light) * clear
+            color = self.scene.color_at(palette, y).lerp(body, max(0, min(1, strength)))
+            band_width = radius * 2 * (1 - (1 - self.BODY_TAPER) * share) * width
+            slide = shift * (s(self.BODY_SHIFT[0]) + (s(self.BODY_SHIFT[1]) - s(self.BODY_SHIFT[0])) * share)
+            x = sky.body_x + slide - band_width / 2
+            band = pygame.Rect(round(x), round(y), max(1, round(band_width)), max(1, round(tall)))
+            pygame.draw.rect(surface, color, band, border_radius=max(1, round(tall / 2)))
 
     def draw_star_reflections(self, surface, palette, clear):
         # Each star mirrored below the horizon as a short dash, twinkling with its star;

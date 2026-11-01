@@ -108,4 +108,73 @@ THEMES = {
             "shadow": 0.25,
         },
     },
+
+    "snow": {
+        "dark": {
+            "bg": "#1c2436",
+            "text": "#dbe5f2",
+            "accent": "#f2d58a",
+            "field": "#28334a",
+            "muted": "#8391a8",
+            "overlay": (0, 0, 0, 160),
+            "history_box": (0, 0, 0, 60),
+            "range_fill": "#f2d58a",
+            "bar": (0, 0, 0, 50),
+            "sky_top": "#090e1b",       # a clear, cold night
+            "sky_low": "#1a2337",
+            "sky_body": "moon",
+            "body": "#eef0e4",
+            "body_glow": "#36435e",
+            "cloud": "#202a3e",
+            "star": "#d2dcee",
+            "mountain": "#1d2638",      # far away: kept close to the sky
+            "mountain_snow": "#3b4762",
+            "fir": "#0e151d",
+            "fir_snow": "#2e3a50",
+            "snow_top": "#28324a",      # moonlit snow, bluer far away
+            "snow_bottom": "#1a2131",
+            "snow_shadow": "#111726",
+            "snow_lit": "#3a4662",      # moonlight catching the drift crests
+            "ice_far": "#182236",       # the frozen pond: darker and glassier than the snow
+            "ice_near": "#101826",
+            "ice_rim": "#36425c",
+            "ice_crack": "#4a5874",
+            "flake": "#d6e0ef",
+            "halo": "#121a29",
+            "shadow": 0.12,
+        },
+        "light": {
+            "bg": "#d5e0ea",
+            "text": "#253244",
+            "accent": "#74470a",
+            "field": "#eef3f7",
+            "muted": "#4b5b70",
+            "overlay": (0, 0, 0, 100),
+            "history_box": (0, 0, 0, 25),
+            "range_fill": "#74470a",
+            "bar": (0, 0, 0, 25),
+            "sky_top": "#9fb4c8",       # a crisp winter day
+            "sky_low": "#dae4ec",
+            "sky_body": "sun",
+            "body": "#fffbee",
+            "body_glow": "#f6f2e2",
+            "cloud": "#f1f5f8",
+            "mountain": "#a5b6c7",
+            "mountain_snow": "#e9eff4",
+            "fir": "#4a6157",
+            "fir_snow": "#e4ecf1",
+            "snow_top": "#e3eaf1",      # bright snow, slightly blue so it isn't glaring
+            "snow_bottom": "#cbd8e4",
+            "snow_shadow": "#a9bccf",
+            "snow_lit": "#f6f9fb",
+            "ice_far": "#b6c9d8",       # the frozen pond: a cool grey-blue against the white
+            "ice_near": "#9cb3c6",
+            "ice_rim": "#f2f6f9",
+            "ice_crack": "#dbe6ee",
+            "flake": "#ffffff",
+            "flake_edge": "#9fb1c4",    # so flakes show against the pale sky
+            "halo": "#e3eaf1",
+            "shadow": 0.25,
+        },
+    },
 }

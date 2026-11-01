@@ -12,6 +12,7 @@
 #   "storm"     0 = calm, 1 = as wild as it gets
 #   "wind"      1 = a normal breeze
 #   "light"     1 = normal daylight or moonlight; lower when it clouds over
+#   "light_x", "light_y"    where the sun or moon is on the screen, if the sky has one
 #
 # There's also a quiet zone: the column in the middle where the game's text and boxes sit.
 # Busy things fade there, so the game stays easy to read. Layers ask the background
