@@ -149,8 +149,15 @@ THEMES = {
             "window": "#171c27",
             "window_lit": "#ffcf73",    # warm lights coming on at night
             "smoke": "#46526a",
+            "branch": "#1d1a1a",        # the framing: a fir bough and frozen grass
+            "needle": "#16231f",
+            "bough_snow": "#3e4a66",
+            "icicle": "#8fa3c2",
+            "bird": "owl",              # an owl keeps watch at night...
+            "owl_body": "#3a3029",
+            "owl_eye": "#f0c860",
             "halo": "#121a29",
-            "shadow": 0.12,
+            "shadow": 0.2,
         },
         "light": {
             "bg": "#d5e0ea",
@@ -191,8 +198,16 @@ THEMES = {
             "roof_snow": "#f4f7fa",
             "window": "#4d5d70",
             "smoke": "#b4bfca",         # grey, or it would vanish against the white snow
+            "branch": "#4a3d32",
+            "needle": "#3d5a4a",
+            "bough_snow": "#f4f7fa",
+            "icicle": "#a9c4d8",
+            "melt": True,               # the sun is warm enough for the icicles to drip
+            "bird": "robin",            # ... and a robin by day
+            "robin_body": "#6b5a4c",
+            "robin_breast": "#d4663a",
             "halo": "#e3eaf1",
-            "shadow": 0.25,
+            "shadow": 0.45,
         },
     },
 }

@@ -1,7 +1,7 @@
 # The snow theme's background: a snowy landscape with a frozen pond, seen from an angle,
 # under a winter sky with snow falling
 
-from partials.config import ROUND_Y, s
+from partials.config import ROUND_Y, HEIGHT, s
 from partials.backgrounds.base import LayeredBackground
 from partials.backgrounds.perspective import Perspective
 from partials.backgrounds.sky import Sky
@@ -10,6 +10,7 @@ from partials.backgrounds.snowfield import SnowField, FrozenPond, SnowSparkle
 from partials.backgrounds.flakes import Snowfall, DiamondDust
 from partials.backgrounds.aurora import Aurora
 from partials.backgrounds.village import Village
+from partials.backgrounds.winterframe import FirBough
 
 
 class SnowBackground(LayeredBackground):
@@ -46,6 +47,13 @@ class SnowBackground(LayeredBackground):
         self.village = self.add(Village(self))
         self.flakes = self.add(Snowfall(self))
         self.dust = self.add(DiamondDust(self))
+
+        # Close to us: two boughs of a big fir standing just out of sight on the right,
+        # one just below the sun or moon, one lower down with a bird on it
+        self.upper_bough = self.add(FirBough(self, side="right", height=self.sky.body_y + s(32),
+                                             reach=115, droop=45, bird=False))
+        self.lower_bough = self.add(FirBough(self, side="right", height=HEIGHT * 0.6,
+                                             reach=95, droop=40))
 
     def update_weather(self):
         # The weather report every layer reads: heavy snow is a storm
