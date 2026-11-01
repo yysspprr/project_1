@@ -54,6 +54,8 @@ THEMES = {
             "body_glow": "#3a4560",
             "cloud": "#232c3e",
             "star": "#c8d2e6",
+            "trees": "#141b28",         # the far shore: kept close to the sky so it stays in the haze
+            "far_hill": "#1a2232",
         },
         "light": {
             "bg": "#b0c4d4",
@@ -80,6 +82,8 @@ THEMES = {
             "body": "#fbf7ea",
             "body_glow": "#f3f1e6",
             "cloud": "#eef2f5",
+            "trees": "#94a39d",
+            "far_hill": "#b7c4cc",
         },
     },
 }

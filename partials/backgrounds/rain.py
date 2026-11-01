@@ -9,6 +9,7 @@ from partials.backgrounds.helpers import Timer
 from partials.backgrounds.perspective import Perspective
 from partials.backgrounds.sky import Sky
 from partials.backgrounds.water import WaterSurface
+from partials.backgrounds.shore import FarShore
 from partials.backgrounds.ripples import Ripples
 from partials.backgrounds.debris import FloatingDebris
 from partials.backgrounds.wildlife import WaterStriders, RisingFish
@@ -44,6 +45,7 @@ class RainBackground(LayeredBackground):
         # Back to front: the sky, the water and what happens on it, then the rain in front of it all
         self.sky = self.add(Sky(self))
         self.water = self.add(WaterSurface(self))
+        self.shore = self.add(FarShore(self, sky=self.sky))
         self.ripples = self.add(Ripples(self))
         self.fish = self.add(RisingFish(self, on_ripple=self.ripples.add))
         self.debris = self.add(FloatingDebris(self, on_ripple=self.ripples.add))

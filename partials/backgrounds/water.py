@@ -14,7 +14,9 @@ class WaterSurface(Layer):
     # with soft wavy edges that boil, and a few glints of light drifting on top.
     # The bands get thinner toward the top, following the scene's perspective.
     # A storm (the scene's weather["storm"]) churns the water, and the glints follow the
-    # scene's weather["light"]. If the view has a horizon, the water starts there
+    # scene's weather["light"]. If the view has a horizon, the water starts there.
+    # If something in the sky gives off light (the scene's weather["light_x"]), some of
+    # the glints gather into a shimmering column below it: its reflection on the water
     #
     # Palette colors it uses (each falls back to "bg" if a theme doesn't have it):
     #   "water_top", "water_bottom"     the farthest and nearest band
@@ -34,6 +36,11 @@ class WaterSurface(Layer):
     GLINT_POINTS = 5                # points along each glint
     GLINT_BEND = 1.5                # how far a glint's points wobble up and down, in pixels up close
     GLINT_SPREAD = 0.6              # how much glints crowd toward the back (see Perspective.random_y)
+    COLUMN_GLINTS = 16              # extra glints in the column under the sun or moon
+    COLUMN_LENGTH = (6, 22)         # shorter than the loose glints, up close in pixels
+    COLUMN_WIDTH = (4, 30)          # how far the column spreads sideways: at the horizon, up close
+    COLUMN_REACH = 0.6              # how far down the water it reaches (1 = to the bottom of the window)
+    COLUMN_STRENGTH = 0.95          # brightest a column glint gets, right below the light
     STORM_ROUGH = 2.5               # how much faster the band edges churn in a full storm
 
     def __init__(self, scene):
@@ -45,8 +52,8 @@ class WaterSurface(Layer):
 
         # Start with glints already at different ages, so they don't all fade in together
         self.glints = []
-        for i in range(self.GLINTS):
-            glint = self.make_glint()
+        for i in range(self.GLINTS + self.COLUMN_GLINTS):
+            glint = self.make_glint(column=i >= self.GLINTS)
             glint["age"] = random.randint(0, glint["lifetime"])
             self.glints.append(glint)
 
@@ -105,17 +112,32 @@ class WaterSurface(Layer):
 
     # ---- Glints ----
 
-    def make_glint(self):
+    def make_glint(self, column=False):
         view = self.scene.view
-        y = view.random_y(self.GLINT_SPREAD)
+        light_x = self.scene.weather.get("light_x")
+        if column and light_x is not None:
+            # In the column: crowded near the horizon, spreading wider as it comes closer
+            top = view.horizon
+            y = top + (HEIGHT - top) * self.COLUMN_REACH * random.random() ** 1.6
+            spread = s(self.COLUMN_WIDTH[0]) + (s(self.COLUMN_WIDTH[1]) - s(self.COLUMN_WIDTH[0])) * view.nearness(y)
+            x = light_x + random.gauss(0, 0.5) * spread
+            length = s(random.randint(*self.COLUMN_LENGTH))
+        else:
+            column = False
+            y = view.random_y(self.GLINT_SPREAD)
+            x = random.uniform(0, WIDTH)
+            length = s(random.randint(*self.GLINT_LENGTH))
         size = view.scale(y)
+        if column:
+            size = 0.35 + 0.65 * size       # the column stays visible right up to the horizon
         return {
-            "x": random.uniform(0, WIDTH),
+            "column": column,
+            "x": x,
             "y": y,
-            "length": s(random.randint(*self.GLINT_LENGTH)) * size,
+            "length": length * size,
             "lifetime": random.randint(*self.GLINT_LIFETIME),
             "age": 0,
-            "drift": s(random.uniform(*self.GLINT_DRIFT)) * size * random.choice((-1, 1)),
+            "drift": s(random.uniform(*self.GLINT_DRIFT)) * size * random.choice((-1, 1)) * (0.2 if column else 1),
             "bend": make_jitter(self.GLINT_POINTS, s(self.GLINT_BEND) * size),
         }
 
@@ -126,7 +148,7 @@ class WaterSurface(Layer):
             glint["age"] += dt
             glint["x"] += glint["drift"] * dt / 1000
             if glint["age"] >= glint["lifetime"]:
-                self.glints[i] = self.make_glint()      # a gone glint is replaced somewhere else
+                self.glints[i] = self.make_glint(glint["column"])   # replaced somewhere else
 
     def wobble(self):
         self.nudge_band_edges()
@@ -147,7 +169,12 @@ class WaterSurface(Layer):
             progress = glint["age"] / glint["lifetime"]
             # Fade in, hold, fade out: a soft bump that peaks in the middle
             bump = 1 - (2 * progress - 1) ** 2
-            strength = min(1, bump * self.GLINT_STRENGTH * light * view.clarity(glint["y"]) * self.scene.keep(glint["x"]))
+            if glint["column"]:
+                # Brightest right under the light, fading as the column comes closer
+                peak = self.COLUMN_STRENGTH * (1 - 0.6 * view.nearness(glint["y"]))
+            else:
+                peak = self.GLINT_STRENGTH
+            strength = min(1, bump * peak * light * view.clarity(glint["y"]) * self.scene.keep(glint["x"]))
             color = self.color_at(palette, glint["y"]).lerp(glint_color, strength)
             line = max(1, round(s(self.GLINT_WIDTH) * view.scale(glint["y"])))
 
