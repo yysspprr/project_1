@@ -3,14 +3,17 @@
 
 from partials.backgrounds.base import LayeredBackground
 from partials.backgrounds.perspective import Perspective
-from partials.backgrounds.brook import BrookCourse, BrookBed, BrookWater, BrookRocks, BrookLeaves
+from partials.backgrounds.brook import BrookCourse, BrookBed, BrookWater, BrookRocks, BrookLeaves, BrookHaze, FallenLog
+from partials.backgrounds.brook_flow import BrookCurrent, BrookWakes, DriftingLeaves
 
 
 class StreamBackground(LayeredBackground):
 
-    # Looking down at the brook from just above: the top of the window is only a little
-    # further away than the bottom
-    FAR_SCALE = 0.75
+    # Looking down at the brook at a slant: the top of the window is further away than the
+    # bottom, so things there look smaller and a little more squashed
+    FAR_SCALE = 0.6
+    NEAR_FLATTEN = 0.75
+    FAR_FLATTEN = 0.55
 
     # Things that wax and wane on their own: (lowest, highest), and milliseconds to change.
     # A serene scene: just a breeze that comes and goes, and the light, never a storm
@@ -20,17 +23,25 @@ class StreamBackground(LayeredBackground):
     LIGHT_TIME = (7000, 16000)
 
     def __init__(self):
-        super().__init__(Perspective(far_scale=self.FAR_SCALE))
+        super().__init__(Perspective(far_scale=self.FAR_SCALE, near_flatten=self.NEAR_FLATTEN, far_flatten=self.FAR_FLATTEN))
         self.breeze = self.swell(*self.BREEZE, self.BREEZE_TIME)
         self.light = self.swell(*self.LIGHT, self.LIGHT_TIME)
         self.update_weather()
 
-        # Back to front: the bed and banks, the water, the rocks, then fallen leaves
+        # Back to front: the bed and banks, the water and its current, the stones and the
+        # ripples behind them, leaves (drifting on the water, lying on the banks), and the
+        # fallen log on games when that's how the brook is crossed (stepping stones otherwise)
         self.course = BrookCourse(self.view)
         self.bed = self.add(BrookBed(self, self.course))
         self.water = self.add(BrookWater(self, self.course))
-        self.rocks = self.add(BrookRocks(self, self.course))
+        self.current = self.add(BrookCurrent(self, self.course, self.water))
+        self.rocks = BrookRocks(self, self.course)
+        self.wakes = self.add(BrookWakes(self, self.course, self.water, self.rocks))
+        self.add(self.rocks)
+        self.drifting = self.add(DriftingLeaves(self, self.course, self.water, self.rocks))
         self.leaves = self.add(BrookLeaves(self, self.course))
+        self.log = self.add(FallenLog(self, self.course))            # only on some games
+        self.haze = self.add(BrookHaze(self))
 
     def update_weather(self):
         self.weather["storm"] = 0

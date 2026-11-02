@@ -236,6 +236,7 @@ THEMES = {
             "water_deep": "#11232b",
             "shallows": "#1f3a44",
             "foam": "#4d6670",
+            "ripple": "#3a5a66",
             "rock": "#2b2f2e",          # stones
             "rock_light": "#3a403f",
             "rock_dark": "#1a1e1d",
@@ -246,6 +247,13 @@ THEMES = {
             "bank_light": "#223524",
             "clover": "#1f3423",
             "litter": ["#3a3020", "#33281b", "#3d3524"],
+            "bark": "#2c2520",          # the fallen log
+            "bark_light": "#3a322b",
+            "bark_dark": "#1a1512",
+            "wood": "#4a4032",
+            "wood_ring": "#352d23",
+            "haze": "#060a08",          # darkness gathering at the far end
+            "haze_strength": 0.35,
             "halo": "#0f1512",
             "shadow": 0.15,
         },
@@ -266,6 +274,7 @@ THEMES = {
             "water_deep": "#7fb0bd",
             "shallows": "#b9d8da",
             "foam": "#f2f7f6",
+            "ripple": "#e4f2f2",
             "rock": "#8d918a",          # stones
             "rock_light": "#b7bab2",
             "rock_dark": "#696d66",
@@ -276,6 +285,13 @@ THEMES = {
             "bank_light": "#a3c27d",
             "clover": "#5b8a45",
             "litter": ["#c79a52", "#b0743e", "#d2b064"],
+            "bark": "#6e5642",          # the fallen log
+            "bark_light": "#8d735a",
+            "bark_dark": "#4b3a2c",
+            "wood": "#d2b183",
+            "wood_ring": "#a7845a",
+            "haze": "#e8eee6",          # soft light in the air at the far end
+            "haze_strength": 0.3,
             "halo": "#e4eedc",
             "shadow": 0.35,
         },
