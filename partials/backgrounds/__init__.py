@@ -8,6 +8,7 @@ from partials.backgrounds.blossom import BlossomBackground
 from partials.backgrounds.desert import DesertBackground
 from partials.backgrounds.home import HomeBackground
 from partials.backgrounds.underwater import UnderwaterBackground
+from partials.backgrounds.seaside import SeasideBackground
 
 
 # Which background goes with which theme (themes without one use a plain color)
@@ -19,6 +20,7 @@ BACKGROUNDS = {
     "desert": DesertBackground,
     "home": HomeBackground,
     "underwater": UnderwaterBackground,
+    "seaside": SeasideBackground,
 }
 
 def make_background(theme):
