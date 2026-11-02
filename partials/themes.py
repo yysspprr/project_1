@@ -252,6 +252,10 @@ THEMES = {
             "bark_dark": "#1a1512",
             "wood": "#4a4032",
             "wood_ring": "#352d23",
+            "glint": "#c8d8e8",         # moonlight on the water, and fireflies
+            "moonlight": True,
+            "moonlight_sheen": (22, 30, 38),
+            "firefly": "#e8f08a",
             "haze": "#060a08",          # darkness gathering at the far end
             "haze_strength": 0.35,
             "halo": "#0f1512",
@@ -290,6 +294,8 @@ THEMES = {
             "bark_dark": "#4b3a2c",
             "wood": "#d2b183",
             "wood_ring": "#a7845a",
+            "sunlight": (60, 54, 28),    # light added where the sun gets through the leaves
+            "glint": "#ffffff",
             "haze": "#e8eee6",          # soft light in the air at the far end
             "haze_strength": 0.3,
             "halo": "#e4eedc",

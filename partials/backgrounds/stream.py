@@ -5,6 +5,7 @@ from partials.backgrounds.base import LayeredBackground
 from partials.backgrounds.perspective import Perspective
 from partials.backgrounds.brook import BrookCourse, BrookBed, BrookWater, BrookRocks, BrookLeaves, BrookHaze, FallenLog
 from partials.backgrounds.brook_flow import BrookCurrent, BrookWakes, DriftingLeaves
+from partials.backgrounds.brook_light import SunDapples, WaterGlints, Fireflies
 
 
 class StreamBackground(LayeredBackground):
@@ -30,18 +31,23 @@ class StreamBackground(LayeredBackground):
 
         # Back to front: the bed and banks, the water and its current, the stones and the
         # ripples behind them, leaves (drifting on the water, lying on the banks), and the
-        # fallen log on games when that's how the brook is crossed (stepping stones otherwise)
+        # fallen log on games when that's how the brook is crossed (stepping stones otherwise),
+        # sunlight through the leaves, the far end's haze, and fireflies
         self.course = BrookCourse(self.view)
         self.bed = self.add(BrookBed(self, self.course))
         self.water = self.add(BrookWater(self, self.course))
         self.current = self.add(BrookCurrent(self, self.course, self.water))
+        self.dapples = SunDapples(self)                                 # drawn later, over everything
+        self.glints = self.add(WaterGlints(self, self.course, self.water, self.dapples))
         self.rocks = BrookRocks(self, self.course)
         self.wakes = self.add(BrookWakes(self, self.course, self.water, self.rocks))
         self.add(self.rocks)
         self.drifting = self.add(DriftingLeaves(self, self.course, self.water, self.rocks))
         self.leaves = self.add(BrookLeaves(self, self.course))
         self.log = self.add(FallenLog(self, self.course))            # only on some games
+        self.add(self.dapples)                                          # sunlight by day
         self.haze = self.add(BrookHaze(self))
+        self.fireflies = self.add(Fireflies(self, self.course))         # at night
 
     def update_weather(self):
         self.weather["storm"] = 0
