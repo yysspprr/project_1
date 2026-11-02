@@ -10,6 +10,10 @@ from partials.backgrounds.base import LayeredBackground
 from partials.backgrounds.perspective import Perspective
 from partials.backgrounds.sky import Sky
 from partials.backgrounds.garden import MistyHills, Pagoda, GardenPond, StoneLantern, BlossomTree, BlossomBranch, Petals
+from partials.backgrounds.pond_life import Koi, LilyPads, LanternShimmer
+from partials.backgrounds.lanterns import PathLanterns, SkyLanterns
+from partials.backgrounds.brook_life import Visits, VisitClock
+from partials.backgrounds.garden_life import WhiteEye, Heron, Cat, RoofBirds
 
 
 class BlossomBackground(LayeredBackground):
@@ -41,16 +45,35 @@ class BlossomBackground(LayeredBackground):
         self.gust_age = None        # how far into a gust we are, or None between gusts
         self.update_weather()
 
-        # Back to front: sky, hills, the pagoda, the garden and its pond, trees at the sides,
-        # the stone lantern, the branch, then falling petals
+        # Back to front: sky, hills, the pagoda, the garden and its pond, koi under the water
+        # and lily pads on it, trees at the sides, the stone lantern, paper lanterns along the
+        # path, the branch and the bird on it, falling petals, and (some nights) sky lanterns
+        # rising. Rare visitors (a flock off the pagoda, a heron, a cat) take turns
         self.sky = self.add(Sky(self))
+        self.sky_lanterns = SkyLanterns(self)                         # drawn last, rising over everything
         self.hills = self.add(MistyHills(self))
         self.pagoda = self.add(Pagoda(self, self.hills))
+        visits = Visits()                                               # rare visitors take turns
+        self.add(VisitClock(self, visits))
+        self.roof_birds = self.add(visits.join(RoofBirds(self, self.pagoda)))
         self.garden = self.add(GardenPond(self))
+        self.koi = self.add(Koi(self, self.garden, on_ring=self.ring))
+        self.lilies = self.add(LilyPads(self, self.garden))
+        self.heron = self.add(visits.join(Heron(self, self.garden, on_ring=self.ring)))
         self.trees = [self.add(BlossomTree(self, WIDTH - s(4), s(262), s(70)))]
         self.lantern = self.add(StoneLantern(self))
+        self.shimmer = self.add(LanternShimmer(self, self.garden, self.lantern))   # its light on the water, at night
+        self.path_lanterns = self.add(PathLanterns(self, self.garden))
+        self.cat = self.add(visits.join(Cat(self)))
         self.branch = self.add(BlossomBranch(self))
-        self.petals = self.add(Petals(self, self.garden, self.branch))
+        self.petals = Petals(self, self.garden, self.branch)
+        self.white_eye = self.add(WhiteEye(self, self.branch, self.petals))   # by day
+        self.add(self.petals)
+        self.add(self.sky_lanterns)
+
+    def ring(self, x, y):
+        # A ring spreading on the pond (the petals layer draws them)
+        self.petals.rings.append({"x": x, "y": y, "age": 0.0})
 
     def gust(self):
         # 0 between gusts; during one it swells up to 1 and back down
