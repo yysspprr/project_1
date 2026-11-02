@@ -482,6 +482,16 @@ THEMES = {
             "body": "#f6f0dc",
             "body_glow": "#8c88b4",
             "star": "#e2e4f4",
+            "milky_way": "#b8b4e0",     # the Milky Way, and the full moon's seas
+            "moon_sea": "#d2ccbd",
+            "jerboa": "#6e6480",        # night creatures
+            "jerboa_light": "#a69cbc",
+            "fennec": "#7a6e8c",
+            "fennec_light": "#a89cbc",
+            "fennec_dark": "#3a3348",
+            "caravan": "#151326",
+            "fire": "#f08a3c",          # the campfire
+            "fire_core": "#ffd77a",
             "pyramid_lit": "#4a4566",   # moonlit pyramids and dunes, cool blue
             "pyramid_shadow": "#2a2742",
             "dune_lit": "#46436a",
@@ -499,6 +509,11 @@ THEMES = {
             "rock": "#3a3550",           # rocks
             "rock_light": "#4c4766",
             "rock_dark": "#221f33",
+            "pool_ripple": "#4e4a78",
+            "tumbleweed": "#4e4660",
+            "tumbleweed_dark": "#2e2a3c",
+            "dust": "#463a52",          # a sandstorm at night
+            "dust_streak": "#6e6488",
             "palm_trunk": "#2c2632",
             "palm_trunk_dark": "#1a1620",
             "palm_frond": "#24342e",
@@ -539,6 +554,20 @@ THEMES = {
             "rock": "#b08260",           # rocks
             "rock_light": "#d1a57c",
             "rock_dark": "#7d5638",
+            "pool_ripple": "#eef6f7",
+            "tumbleweed": "#b39062",
+            "tumbleweed_dark": "#7a5e3c",
+            "dust": "#c98f55",          # a sandstorm
+            "dust_streak": "#fbe6c0",
+            "shimmer": 1.6,
+            "smoke": "#c7b9a4",
+            "lizard": "#b3895a",        # day creatures and visitors
+            "lizard_dark": "#6e4e30",
+            "scarab": "#2a2622",
+            "scarab_ball": "#8a6a48",
+            "hawk": "#4a3a30",
+            "caravan": "#8a6a50",
+            "mirage": "#bcd8e4",         # a thread of smoke from the cold campfire             # heat shimmer over the horizon, by day
             "palm_trunk": "#9a7550",
             "palm_trunk_dark": "#6b4d32",
             "palm_frond": "#5e9a45",
