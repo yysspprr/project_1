@@ -1,7 +1,5 @@
 # Life in the snow: tracks pressed into it, a fox that comes by now and then to hunt
-# mice under the snow, and, very rarely, a December night visitor in the sky
-
-import datetime
+# mice under the snow, and, rarely, a night visitor in the sky
 
 import math
 
@@ -266,16 +264,15 @@ class Fox(Layer):
 
 
 class SleighRide(Layer):
-    # Exceedingly rare: on a December night, a sleigh pulled by reindeer flies across the
-    # sky in front of the moon, as a dark silhouette with a little trail of glitter.
-    # Only at night (when the palette has "sleigh") and only in December
+    # Rare: now and then on a night, a sleigh pulled by reindeer flies across the sky in
+    # front of the moon, as a dark silhouette with a little trail of glitter.
+    # Only at night (when the palette has "sleigh")
     #
     # Palette colors it uses:
     #   "sleigh"        the silhouette (no visits without it)
     #   "star"          the glitter trail (falls back to "text")
 
-    WAIT = (5000, 10000)         # milliseconds between visits: 8 to 15 minutes [(480000, 900000)]
-    ONLY_IN_DECEMBER = False         # set to False to see it any month (handy for testing) [True]
+    WAIT = (300000, 600000)         # milliseconds between visits: 5 to 10 minutes
     FLIGHT = 7000                   # milliseconds to cross the sky
     SIZE = 12                       # one reindeer's length, in pixels at the medium size
     REINDEER = 4                    # in pairs
@@ -288,9 +285,6 @@ class SleighRide(Layer):
         self.flying = None
         self.allowed = False        # set from the palette each frame: only at night
         self.trail = []
-
-    def in_season(self):
-        return not self.ONLY_IN_DECEMBER or datetime.date.today().month == 12
 
     def path(self, t):
         # Right to left across the sky, dipping to pass in front of the moon
@@ -309,7 +303,7 @@ class SleighRide(Layer):
         self.trail = [speck for speck in self.trail if speck["age"] < speck["life"]]
 
         if self.flying is None:
-            if self.allowed and self.in_season():
+            if self.allowed:
                 self.timer -= dt
                 if self.timer <= 0:
                     self.flying = 0

@@ -6,6 +6,8 @@ from partials.backgrounds.snow import SnowBackground
 from partials.backgrounds.stream import StreamBackground
 from partials.backgrounds.blossom import BlossomBackground
 from partials.backgrounds.desert import DesertBackground
+from partials.backgrounds.home import HomeBackground
+from partials.backgrounds.underwater import UnderwaterBackground
 
 
 # Which background goes with which theme (themes without one use a plain color)
@@ -15,6 +17,8 @@ BACKGROUNDS = {
     "stream": StreamBackground,
     "blossom": BlossomBackground,
     "desert": DesertBackground,
+    "home": HomeBackground,
+    "underwater": UnderwaterBackground,
 }
 
 def make_background(theme):
