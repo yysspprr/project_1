@@ -1,7 +1,7 @@
-# A tropical beach, looking out to sea: the open sea to the horizon with a little palm cay
-# and a far headland with a lighthouse, turquoise shallows inside a line of surf on the
-# outer reef, and waves rolling in to break and wash up the sand, leaving it wet and
-# shining as they draw back. A leaning palm frames the left, rocks and beach grass the right
+# The far side of the water: faint hills and a treeline sitting on the horizon,
+# and their reflection in the water, broken up into strips by the ripples.
+# If the scene has a sky, the water also reflects what's in it: the clouds,
+# the sun or moon, and the stars
 
 import math
 
@@ -9,369 +9,285 @@ import random
 
 import pygame
 
-from partials.config import WIDTH, HEIGHT, CENTER_X, s
+from partials.config import WIDTH, s
 from partials.backgrounds.base import Layer
+from partials.backgrounds.helpers import make_jitter
 
 
-SHORE = 452                         # where the sea meets the sand when the water is still, pixels at the medium size
-REEF = 236                          # the line of surf on the outer reef
-
-
-class Sea(Layer):
-    # The sea from the horizon to the shore, and the beach below it: deep blue far out,
-    # turquoise over the shallows, a faint band of surf along the outer reef, then wet sand
-    # darkening the shore and dry sand down to the bottom of the window. Far off: a little
-    # cay with palms on the right, a headland with a lighthouse on the left. Painted once,
-    # apart from the surf line, which shimmers
+class FarShore(Layer):
+    # Draw it after the water (its reflection lies on top of the water) and before
+    # anything floating on it. Kept low and soft so it never fights with the game's text.
+    # In a storm it fades into the rain haze
     #
     # Palette colors it uses:
-    #   "sea_far", "sea_mid", "shallows"        the water out at the horizon, halfway, close in
-    #   "surf"                                  the surf on the reef (and foam)
-    #   "sand_wet", "sand_dry", "sand_near"     the beach
-    #   "far_land", "far_palm"                  the headland and the cay (fading into the haze)
-    #   "lighthouse", "lighthouse_band"
+    #   "trees"         the treeline (falls back to "muted")
+    #   "far_hill"      the hills behind it (no hills without it)
 
-    def __init__(self, scene):
+    TREE_HEIGHT = 14                # tallest treetops, in pixels at the medium size
+    TREE_WIDTH = (8, 17)            # how wide one tree's crown is
+    FIRS = 0.25                     # share of the trees that are pointed firs
+    HILL_HEIGHT = 32                # tallest hilltop
+    JITTER = 0.6                    # how far outline points wobble, in pixels
+
+    REFLECT_DEPTH = 0.75            # how tall the reflection is, compared to the shore itself
+    REFLECT_STRENGTH = 0.45         # how strongly it shows in the water (0 = invisible, 1 = as dark as the trees)
+    STRIP = (1.5, 3)                # height of each unbroken strip of reflection, in pixels
+    STRIP_GAP = (0.5, 1.5)          # gap between strips near the shore; the gaps grow further down
+    STRIP_SHIFT = 3                 # how far a strip slides sideways, in pixels
+    STORM_HAZE = 0.7                # how much a full storm hides the shore (0 = not at all, 1 = gone)
+
+    CLOUD_REFLECT = 0.22            # how strongly the clouds show in the water (0 = not at all)
+    CLOUD_SQUASH = 0.45             # the reflections are flatter than the clouds
+    CLOUD_DEPTH = 0.8               # how far below the horizon they land, compared to how high the cloud is
+
+    # The sun or moon on rippled water: not a neat mirror image, but a long column of
+    # broken bands stretching toward us, narrower and fainter the further it reaches
+    BODY_REFLECT = 0.8              # how strongly the bands show right under the sun or moon
+    BODY_GLOW_REFLECT = 0.4         # how strongly its glow shows in the water
+    BODY_LENGTH = 9                 # how far the column reaches, in sun or moon radii
+    BODY_TAPER = 0.3                # how wide the bands are at the far end, compared to the start
+    BODY_BAND = (1, 2.5)            # how tall each band is, in pixels
+    BODY_BAND_GAP = (1.2, 3)        # the gaps between bands; they grow further down
+    BODY_SHIFT = (2, 7)             # how far bands slide sideways: at the top, at the far end
+    BODY_SPLIT = 0.4                # chance a band is broken into two pieces
+    BODY_GLOW_STRETCH = 2.2         # the glow's reflection is this many times taller than the glow
+
+    STAR_REFLECT = 0.55             # how strongly the stars show in the water
+    STAR_DEPTH = 0.85               # how far below the horizon they land, compared to how high the star is
+    STAR_SHIMMER = 1.5              # how far a reflected star jumps sideways on each wobble
+    STAR_BROKEN = 0.2               # chance a reflected star is broken up by a ripple on each wobble
+    STAR_QUIET = 0.6                # how much they fade behind the game's text
+
+    def __init__(self, scene, sky=None):
         super().__init__(scene)
+        self.sky = sky              # the sky layer, for reflecting its clouds (optional)
         self.horizon = scene.view.horizon
-        self.time = 0
-        self.image = None
+        self.trees = self.make_treeline()
+        self.hills = self.make_hills()
+        self.jitter = make_jitter(len(self.trees) + len(self.hills), 1)
+        self.strips = self.make_strips()
+        self.shore_image = None
+        self.reflect_image = None
         self.painted_palette = None
-        self.surf = [(random.uniform(0, WIDTH), random.uniform(0.5, 1.5), random.uniform(0, 6)) for i in range(16)]
+        self.cloud_images = []      # (cloud image, its reflection) pairs, so each is only flipped once
+        self.body_images = []       # the same for the sun or moon and its glow
+        self.body_strips = []
+        self.star_shimmer = []
+        self.shake_reflections()
 
-    def sea_color(self, palette, y):
-        far = pygame.Color(palette.get("sea_far", palette["bg"]))
-        mid = pygame.Color(palette.get("sea_mid", palette["bg"]))
-        near = pygame.Color(palette.get("shallows", palette["bg"]))
-        reef = s(REEF)
-        if y < reef:
-            return far.lerp(mid, max(0.0, min(1.0, (y - self.horizon) / (reef - self.horizon))) ** 0.8)
-        return mid.lerp(near, max(0.0, min(1.0, (y - reef) / (s(SHORE) - reef))) ** 0.7)
+    # ---- Shapes ----
 
-    def sand_color(self, palette, y):
-        wet = pygame.Color(palette.get("sand_wet", palette["muted"]))
-        dry = pygame.Color(palette.get("sand_dry", palette["bg"]))
-        near = pygame.Color(palette.get("sand_near", palette.get("sand_dry", palette["bg"])))
-        shore = s(SHORE)
-        if y < shore + s(28):
-            return wet
-        if y < shore + s(46):
-            return wet.lerp(dry, (y - shore - s(28)) / s(18))
-        return dry.lerp(near, (y - shore - s(46)) / (HEIGHT - shore - s(46)))
+    def make_treeline(self):
+        # The tops of a row of trees along the horizon, left to right
+        height = s(self.TREE_HEIGHT)
+        top = []
+        x = -s(10)
+        while x < WIDTH + s(10):
+            width = s(random.uniform(*self.TREE_WIDTH))
+            tall = height * random.uniform(0.55, 1)
+            if random.random() < self.FIRS:
+                top += [(x, self.horizon - tall * 0.45), (x + width / 2, self.horizon - tall * 1.15),
+                        (x + width, self.horizon - tall * 0.45)]
+            else:
+                for k in range(6):
+                    angle = math.pi * (1 - k / 5)
+                    top.append((x + width / 2 + math.cos(angle) * width / 2,
+                                self.horizon - tall * 0.6 - math.sin(angle) * tall * 0.4))
+            x += width * random.uniform(0.6, 0.9)
+        return top
+
+    def make_hills(self):
+        height = s(self.HILL_HEIGHT)
+        wave = random.uniform(0, 2 * math.pi)
+        top = []
+        for x in range(-s(10), WIDTH + s(30), s(20)):
+            rise = 0.5 + 0.3 * math.sin(x / s(80) + wave) + 0.2 * math.sin(x / s(37) + wave * 2)
+            top.append((x, self.horizon - height * rise))
+        return top
+
+    def make_strips(self):
+        # Where the reflection is broken: (top, height, sideways shift) for each unbroken strip
+        strips = []
+        depth = (s(self.TREE_HEIGHT) * 1.15 + 2) * self.REFLECT_DEPTH
+        y = 0
+        while y < depth:
+            tall = random.uniform(*self.STRIP)
+            strips.append((y, tall, random.uniform(-1, 1) * self.STRIP_SHIFT))
+            y += tall + random.uniform(*self.STRIP_GAP) * (1 + y / 6)
+        return strips
+
+    # ---- Painting ----
+
+    def outline(self, top, offset):
+        # The shape under a line of tops, with each point wobbled a little
+        points = [(top[0][0], self.horizon + 1)]
+        for i, (x, y) in enumerate(top):
+            points.append((x, y + self.jitter[offset + i] * self.JITTER))
+        points.append((top[-1][0], self.horizon + 1))
+        return points
 
     def paint(self, palette):
-        image = pygame.Surface((WIDTH, HEIGHT - int(self.horizon)))
-        top = int(self.horizon)
-        shore = s(SHORE)
-        for y in range(top, HEIGHT):
-            color = self.sea_color(palette, y) if y < shore else self.sand_color(palette, y)
-            pygame.draw.line(image, color, (0, y - top), (WIDTH, y - top))
-        # The shallows: a lighter, greener band where the sand shows through, and soft bands of colour further out
-        near = pygame.Color(palette.get("shallows", palette["bg"]))
-        for k in range(6):
-            y = s(REEF) + (shore - s(REEF)) * (k + 0.5) / 6
-            band = [(x, y + math.sin(x / s(40) + k) * s(3)) for x in range(-4, WIDTH + 8, 8)]
-            pygame.draw.lines(image, self.sea_color(palette, y).lerp(near.lerp((255, 255, 255), 0.15), 0.25), False,
-                              [(x, yy - top) for x, yy in band], 1)
-        # The far headland with its lighthouse, and the little cay
-        land = pygame.Color(palette.get("far_land", palette["muted"]))
-        hz = self.horizon
-        headland = [(-4, hz + 2), (-4, hz - s(16)), (s(18), hz - s(22)), (s(42), hz - s(18)), (s(70), hz - s(8)), (s(96), hz - s(2)), (s(110), hz + 2)]
-        pygame.draw.polygon(image, land, [(x, y - top + 1) for x, y in headland])
-        self.lamp = (s(28), hz - s(40))
-        tower = pygame.Color(palette.get("lighthouse", palette["text"]))
-        band = pygame.Color(palette.get("lighthouse_band", palette["accent"]))
-        image_top = top
-        self.tower_rect = pygame.Rect(s(24), hz - s(38), s(8), s(18))
-        palm = pygame.Color(palette.get("far_palm", palette["muted"]))
-        cay = [(WIDTH - s(120), hz + 1), (WIDTH - s(108), hz - s(3)), (WIDTH - s(80), hz - s(4)), (WIDTH - s(62), hz + 1)]
-        pygame.draw.polygon(image, land, [(x, y - top + 1) for x, y in cay])
-        for k, (px, h, lean) in enumerate(((WIDTH - s(100), 14, -0.3), (WIDTH - s(88), 18, 0.2), (WIDTH - s(76), 12, 0.35))):
-            crown = (px + lean * s(h), hz - s(3) - s(h))
-            pygame.draw.line(image, palm, (px, hz - s(3) - top + 1), (crown[0], crown[1] - top + 1), max(1, s(1.4)))
-            for a in (-2.6, -2.0, -1.2, -0.5, 0.1):
-                pygame.draw.line(image, palm, (crown[0], crown[1] - top + 1),
-                                 (crown[0] + math.cos(a) * s(6), crown[1] + math.sin(a) * s(3) + s(2) - top + 1), 1)
-        self.image = image
+        tree_color = pygame.Color(palette.get("trees", palette["muted"]))
+        top = self.horizon - s(self.HILL_HEIGHT) - s(4)
+        height = int(self.horizon - top) + 2
+
+        # The shore: only what sticks up above the horizon, on a see-through image
+        shore = pygame.Surface((WIDTH, height), pygame.SRCALPHA)
+        def shifted(points):
+            return [(x, y - top) for x, y in points]
+        if palette.get("far_hill"):
+            pygame.draw.polygon(shore, pygame.Color(palette["far_hill"]),
+                                shifted(self.outline(self.hills, len(self.trees))))
+        pygame.draw.polygon(shore, tree_color, shifted(self.outline(self.trees, 0)))
+        self.shore_image = shore
+        self.shore_top = top
+
+        # The reflection: the treeline upside down and squashed, in a color between
+        # the water and the trees
+        water = self.scene.color_at(palette, self.horizon + 1)
+        reflect_color = water.lerp(tree_color, self.REFLECT_STRENGTH)
+        depth = int((s(self.TREE_HEIGHT) * 1.15 + 2) * self.REFLECT_DEPTH) + 2
+        reflection = pygame.Surface((WIDTH, depth), pygame.SRCALPHA)
+        flipped = []
+        for x, y in self.outline(self.trees, 0):
+            flipped.append((x, (self.horizon - y) * self.REFLECT_DEPTH))
+        pygame.draw.polygon(reflection, reflect_color, flipped)
+        self.reflect_image = reflection
         self.painted_palette = palette
 
-    def color_at(self, palette, y):
-        if y < self.horizon:
-            return None
-        return self.sea_color(palette, y) if y < s(SHORE) else self.sand_color(palette, y)
+    def reflect(self, image, squash):
+        # An image turned upside down and flattened
+        flipped = pygame.transform.flip(image, False, True)
+        height = max(1, int(image.get_height() * squash))
+        return pygame.transform.scale(flipped, (image.get_width(), height))
 
-    def update(self, dt):
-        self.time += dt
+    def reflected(self, image, squash, cache):
+        # The reflection of image, made once and kept while the image stays the same
+        for source, made in cache:
+            if source is image:
+                return made
+        made = self.reflect(image, squash)
+        cache.append((image, made))
+        if len(cache) > 8:
+            del cache[0]
+        return made
+
+    def shake_reflections(self):
+        # New breaks in the sun or moon's reflection, and new shimmer for the stars.
+        # Each band piece: how far down the column it is (0-1), its height, its sideways
+        # shift (as a share of the most it can move there) and its width (as a share of the most)
+        self.body_strips = []
+        if self.sky is not None:
+            length = s(self.sky.BODY_SIZE) * self.BODY_LENGTH
+            y = 0
+            while y < length:
+                share = y / length
+                tall = random.uniform(*self.BODY_BAND)
+                shift = random.uniform(-1, 1)
+                width = random.uniform(0.3, 1)
+                if random.random() < self.BODY_SPLIT:
+                    # Broken in two: a piece either side, with a gap in the middle
+                    self.body_strips.append((share, tall, shift - width * 0.6, width * 0.45))
+                    self.body_strips.append((share, tall, shift + width * 0.6, width * 0.35))
+                else:
+                    self.body_strips.append((share, tall, shift, width))
+                y += tall + random.uniform(*self.BODY_BAND_GAP) * (1 + share * 1.5)
+        count = len(self.sky.stars) if self.sky is not None else 0
+        self.star_shimmer = []
+        for i in range(count):
+            broken = random.random() < self.STAR_BROKEN
+            self.star_shimmer.append(None if broken else random.uniform(-1, 1) * self.STAR_SHIMMER)
+
+    def draw_body_reflection(self, surface, palette, clear):
+        # The sun or moon's reflection: its glow stretched long, with a column of broken
+        # bands on top, starting where the mirror image of the sun or moon would be
+        sky = self.sky
+        light = max(0, min(1, self.scene.weather["light"]))
+        radius = s(sky.BODY_SIZE)
+        length = radius * self.BODY_LENGTH
+        mirror_y = self.horizon + (self.horizon - sky.body_y) * self.CLOUD_DEPTH
+        top = mirror_y - radius * 0.6
+
+        if sky.glow_image is not None:
+            glow = self.reflected(sky.glow_image, self.BODY_GLOW_STRETCH, self.body_images)
+            glow.set_alpha(int(255 * self.BODY_GLOW_REFLECT * light * clear))
+            surface.blit(glow, glow.get_rect(center=(sky.body_x, top + length * 0.3)))
+
+        body = pygame.Color(palette["body"])
+        for share, tall, shift, width in self.body_strips:
+            y = top + share * length
+            fade = 1 - 0.75 * share
+            strength = self.BODY_REFLECT * fade * (0.5 + 0.5 * light) * clear
+            color = self.scene.color_at(palette, y).lerp(body, max(0, min(1, strength)))
+            band_width = radius * 2 * (1 - (1 - self.BODY_TAPER) * share) * width
+            slide = shift * (s(self.BODY_SHIFT[0]) + (s(self.BODY_SHIFT[1]) - s(self.BODY_SHIFT[0])) * share)
+            x = sky.body_x + slide - band_width / 2
+            band = pygame.Rect(round(x), round(y), max(1, round(band_width)), max(1, round(tall)))
+            pygame.draw.rect(surface, color, band, border_radius=max(1, round(tall / 2)))
+
+    def draw_star_reflections(self, surface, palette, clear):
+        # Each star mirrored below the horizon as a short dash, twinkling with its star;
+        # on every wobble they shimmer sideways and a few are broken up by ripples
+        sky = self.sky
+        star = pygame.Color(palette["star"])
+        for dot, shimmer in zip(sky.stars, self.star_shimmer):
+            if shimmer is None:
+                continue
+            y = self.horizon + (self.horizon - dot["y"]) * self.STAR_DEPTH
+            x = dot["x"] + shimmer
+            strength = sky.star_strength(dot) * self.STAR_REFLECT * clear * self.scene.keep(x, self.STAR_QUIET)
+            if strength <= 0.02:
+                continue
+            water = self.scene.color_at(palette, y)
+            half = s(1.5) * self.scene.view.scale(y) + 0.5
+            pygame.draw.line(surface, water.lerp(star, min(1, strength)), (x - half, y), (x + half, y))
+
+    # ---- Layer methods ----
+
+    def wobble(self):
+        self.jitter = make_jitter(len(self.trees) + len(self.hills), 1)
+        self.strips = self.make_strips()        # the ripples break the reflection up differently
+        self.shake_reflections()
+        self.shore_image = None
 
     def draw(self, surface, palette):
-        if self.painted_palette is not palette:
+        if self.shore_image is None or self.painted_palette is not palette:
             self.paint(palette)
-        surface.blit(self.image, (0, self.horizon))
-        # The lighthouse on its headland
-        tower = pygame.Color(palette.get("lighthouse", palette["text"]))
-        band = pygame.Color(palette.get("lighthouse_band", palette["accent"]))
-        r = self.tower_rect
-        pygame.draw.polygon(surface, tower, [(r.left, r.bottom), (r.left + s(1.5), r.top), (r.right - s(1.5), r.top), (r.right, r.bottom)])
-        for k in (0.35, 0.7):
-            y = r.top + r.height * k
-            pygame.draw.line(surface, band, (r.left + s(1), y), (r.right - s(1), y), max(1, s(2)))
-        pygame.draw.rect(surface, band, (r.left + s(1), r.top - s(4), r.width - s(2), s(4)))
-        # Surf breaking along the outer reef: broken white streaks that come and go
-        surf = pygame.Color(palette.get("surf", palette["text"]))
-        y0 = s(REEF)
-        for x, size, phase in self.surf:
-            show = max(0.0, math.sin(self.time / 1300 + phase))
-            if show < 0.1:
-                continue
-            behind = self.sea_color(palette, y0)
-            length = s(14) * size * show
-            pygame.draw.line(surface, behind.lerp(surf, 0.8 * show * self.scene.keep(x, 0.5)), (x - length, y0 + math.sin(phase) * s(2)),
-                             (x + length, y0 + math.sin(phase) * s(2)), max(1, s(2)))
 
+        # Rain haze: the shore and its reflection fade into the sky and water in a storm
+        clear = 1 - self.STORM_HAZE * self.scene.weather["storm"]
+        alpha = int(255 * clear)
 
-class Waves(Layer):
-    # The waves on the beach, one after another: each swell rolls in and steepens, breaks
-    # into a line of foam just off the shore, then runs up the sand as a thin sheet with a
-    # lacy foam edge, slows, and draws back down, leaving a band of wet, shining sand behind
-    # that slowly dulls. Every few waves a bigger one runs further up. Others ask reach(x)
-    # for how far up the beach the water is right now (crabs and birds keep clear of it)
-    #
-    # Palette colors it uses:
-    #   "shallows", "surf"              the sheet of water and the foam
-    #   "sand_shine"                    the wet shine the water leaves behind
+        # Clouds' reflections first: they're the furthest things the water shows
+        if self.sky is not None and palette.get("cloud"):
+            used = []
+            for cloud in self.sky.clouds:
+                image = cloud["image"]
+                if image is None:
+                    continue
+                reflected = None
+                for source, made in self.cloud_images:
+                    if source is image:
+                        reflected = made
+                if reflected is None:
+                    reflected = self.reflect(image, self.CLOUD_SQUASH)
+                used.append((image, reflected))
+                reflected.set_alpha(int(255 * self.CLOUD_REFLECT * clear))
+                below = (self.horizon - cloud["y"]) * self.CLOUD_DEPTH
+                surface.blit(reflected, reflected.get_rect(midtop=(cloud["x"], self.horizon + below)))
+            self.cloud_images = used            # forget the ones that are gone
 
-    PERIOD = (6500, 9000)           # milliseconds from one wave to the next
-    RUN = (34, 62)                  # how far up the sand a wave runs, pixels at the medium size
-    BIG = 0.2                       # chance a wave is a big one
-    STEP = 4                        # pixels between points along the waterline
+        if self.sky is not None and palette.get("star"):
+            self.draw_star_reflections(surface, palette, clear)
+        if self.sky is not None and palette.get("sky_body"):
+            self.draw_body_reflection(surface, palette, clear)
 
-    def __init__(self, scene, sea):
-        super().__init__(scene)
-        self.sea = sea
-        self.columns = list(range(-self.STEP, WIDTH + self.STEP * 2, self.STEP))
-        self.wet = [0.0] * len(self.columns)                # how far up each column is still wet
-        self.shine = [0.0] * len(self.columns)              # how fresh the wet is (1 just left, fading to 0)
-        self.time = 0
-        self.wave = None
-        self.new_wave()
+        self.shore_image.set_alpha(alpha)
+        surface.blit(self.shore_image, (0, self.shore_top))
 
-    def new_wave(self):
-        big = random.random() < self.BIG
-        run = s(random.uniform(*self.RUN)) * (1.35 if big else 1)
-        self.wave = {"age": 0.0, "period": random.uniform(*self.PERIOD), "run": run,
-                     "phases": [random.uniform(0, 6) for k in range(3)], "big": big}
-
-    def shape(self, x):
-        # How the waterline wanders along the beach for this wave: 0.7 to 1.2 of its run
-        a, b, c = self.wave["phases"]
-        return 1 + 0.15 * math.sin(x / s(53) + a) + 0.08 * math.sin(x / s(19) + b) + 0.05 * math.sin(x / s(7) + c)
-
-    def progress(self):
-        # How far up the run the water is: rolling in and breaking (negative: still offshore),
-        # running up, then drawing back
-        t = self.wave["age"] / self.wave["period"]
-        if t < 0.3:
-            return t / 0.3 - 1                              # -1 far out .. 0 at the shore
-        if t < 0.55:
-            u = (t - 0.3) / 0.25
-            return math.sin(u * math.pi / 2)                # rushing up, slowing
-        u = (t - 0.55) / 0.45
-        return 1 - u * u * (3 - 2 * u)                      # drawing back
-
-    def reach(self, x):
-        p = self.progress()
-        return s(SHORE) + max(0.0, p) * self.wave["run"] * self.shape(x)
-
-    def update(self, dt):
-        self.time += dt
-        self.wave["age"] += dt
-        if self.wave["age"] > self.wave["period"]:
-            self.new_wave()
-        p = self.progress()
-        for i, x in enumerate(self.columns):
-            edge = s(SHORE) + max(0.0, p) * self.wave["run"] * self.shape(x)
-            if edge >= self.wet[i] - 1 and p > 0:
-                self.wet[i] = edge
-                self.shine[i] = 1.0
-            else:
-                self.shine[i] = max(0.0, self.shine[i] - dt / 4500)
-                if self.shine[i] <= 0:
-                    self.wet[i] = s(SHORE)
-
-    def draw(self, surface, palette):
-        shallows = pygame.Color(palette.get("shallows", palette["bg"]))
-        foam = pygame.Color(palette.get("surf", palette["text"]))
-        shine = pygame.Color(palette.get("sand_shine", palette["text"]))
-        shore = s(SHORE)
-        # The wet shine left by the last wave, fading
-        for i in range(len(self.columns) - 1):
-            if self.wet[i] <= shore + 1 or self.shine[i] <= 0.02:
-                continue
-            x0, x1 = self.columns[i], self.columns[i + 1]
-            for y in range(int(shore), int(self.wet[i]), 3):
-                sand = self.sea.sand_color(palette, y)
-                fresh = self.shine[i] * (1 - (y - shore) / max(1, self.wet[i] - shore)) ** 0.5
-                pygame.draw.line(surface, sand.lerp(shine, 0.55 * fresh), (x0, y), (x1, y + 2), 3)
-        p = self.progress()
-        quiet = [self.scene.keep(x, 0.6) for x in self.columns]
-        if p < 0:
-            # The swell rolling in: a line steepening and whitening as it nears the shore
-            y = shore + p * s(70)
-            strength = (1 + p) ** 2
-            points = [(x, y + math.sin(x / s(30) + self.time / 700) * s(2)) for x in self.columns]
-            behind = self.sea.sea_color(palette, y)
-            pygame.draw.lines(surface, behind.lerp(foam, 0.75 * strength), False, points, max(1, int(s(1) + s(2) * strength)))
-            if strength > 0.55:
-                # It breaks: foam tumbling along the crest
-                for i in range(0, len(points), 3):
-                    x, yy = points[i]
-                    r = s(2.2) * strength * (0.6 + 0.4 * math.sin(i * 1.7 + self.time / 120))
-                    pygame.draw.circle(surface, behind.lerp(foam, 0.85 * quiet[i]), (x, yy + s(2)), r)
-            return
-        # The sheet of water running up the sand, and its foam edge
-        edge = [(x, shore + p * self.wave["run"] * self.shape(x)) for x in self.columns]
-        sheet = pygame.Surface((WIDTH, int(max(y for x, y in edge) - shore) + s(6)), pygame.SRCALPHA)
-        top = shore - s(4)
-        alpha = int(255 * 0.75)
-        pygame.draw.polygon(sheet, (shallows.r, shallows.g, shallows.b, alpha),
-                            [(self.columns[0], 0)] + [(x, y - top) for x, y in edge] + [(self.columns[-1], 0)])
-        surface.blit(sheet, (0, top))
-        backwash = self.wave["age"] / self.wave["period"] > 0.55
-        lace = foam if not backwash else foam.lerp(shallows, 0.4)
-        pygame.draw.lines(surface, lace, False, edge, max(1, s(2)))
-        for i in range(0, len(edge), 2):
-            x, y = edge[i]
-            if (i * 7 + int(self.time / 200)) % 5 == 0:
-                continue
-            pygame.draw.circle(surface, lace, (x, y - s(3) - (i % 3) * s(1)), max(1, s(1.4)))
-        # A softer line of foam lingering just off the shore
-        for i in range(0, len(self.columns), 2):
-            x = self.columns[i]
-            y = shore - s(5) + math.sin(x / s(15) + self.time / 900) * s(1.5)
-            pygame.draw.circle(surface, self.sea.sea_color(palette, y).lerp(foam, 0.5 * (1 - p) * quiet[i]), (x, y), max(1, s(1.2)))
-
-
-class BeachPalm(Layer):
-    # A tall palm leaning in from the bottom left corner, its trunk curving up the edge of the
-    # window and its crown of long fronds spread overhead at the left, tossing in the sea
-    # breeze. Its shadow lies across the sand
-    #
-    # Palette colors it uses:
-    #   "palm_trunk", "palm_trunk_dark", "palm_frond", "palm_frond_dark", "coconut"
-
-    FRONDS = 11
-
-    def __init__(self, scene):
-        super().__init__(scene)
-        self.time = 0
-        self.base = (s(-14), HEIGHT + s(10))
-        self.crown = (s(46), s(150))
-        self.fronds = [(-math.pi + math.pi * 1.25 * f / (self.FRONDS - 1) - 0.1 + random.uniform(-0.1, 0.1), random.uniform(0.85, 1.15),
-                        random.uniform(0, 6)) for f in range(self.FRONDS)]
-
-    def update(self, dt):
-        self.time += dt
-
-    def draw(self, surface, palette):
-        bark = pygame.Color(palette.get("palm_trunk", palette["muted"]))
-        bark_dark = pygame.Color(palette.get("palm_trunk_dark", palette["muted"]))
-        frond = pygame.Color(palette.get("palm_frond", palette["muted"]))
-        frond_dark = pygame.Color(palette.get("palm_frond_dark", palette["muted"]))
-        wind = self.scene.weather.get("wind", 1)
-        sway = math.sin(self.time / 1600) * 0.06 * wind
-        (bx, by), (cx, cy) = self.base, self.crown
-        cx += sway * s(40)
-        # The trunk: a long curve, thick at the bottom, ringed
-        points = []
-        for k in range(13):
-            t = k / 12
-            points.append((bx + (cx - bx) * t + math.sin(t * math.pi) * s(30), by + (cy - by) * t))
-        for k in range(12):
-            width = max(3, int(s(16) * (1 - k / 14)))
-            pygame.draw.line(surface, bark, points[k], points[k + 1], width)
-            pygame.draw.line(surface, bark_dark, (points[k][0] - width / 2, points[k][1]), (points[k][0] + width / 2, points[k][1] + s(2)), 1)
-        # Fronds: arching out from the crown and drooping, leaflets along them
-        for angle, length, phase in sorted(self.fronds, key=lambda f: math.sin(f[0])):
-            toss = math.sin(self.time / 900 + phase) * 0.06 * wind + sway
-            reach = s(78) * length
-            color = frond_dark if math.sin(angle) < -0.5 else frond
-            spine = []
-            for n in range(9):
-                t = n / 8
-                a = angle + toss + t * 0.6 * (1 if math.cos(angle) > 0 else -1) * 0.5
-                spine.append((cx + math.cos(a) * reach * t, cy + math.sin(a) * reach * t * 0.6 + reach * 0.45 * t * t))
-            pygame.draw.lines(surface, color, False, spine, max(1, s(2)))
-            for n in range(1, 8):
-                px, py = spine[n]
-                leaf = s(13) * (1 - n / 9) * length
-                pygame.draw.line(surface, color, (px, py), (px - leaf * 0.35, py + leaf), max(1, s(1.5)))
-                pygame.draw.line(surface, color, (px, py), (px + leaf * 0.35, py + leaf * 0.85), max(1, s(1.5)))
-        coconut = pygame.Color(palette.get("coconut", palette["muted"]))
-        for k in range(3):
-            pygame.draw.circle(surface, coconut, (cx + (k - 1) * s(5), cy + s(5) + (k % 2) * s(2)), s(4))
-
-
-class BeachFront(Layer):
-    # The near beach on the right: a few dark rocks with a little seaweed, tufts of beach
-    # grass bending in the breeze, and shells and a starfish on the dry sand
-    #
-    # Palette colors it uses:
-    #   "rock", "rock_dark", "beach_grass", "shell", "starfish", "seaweed"
-
-    def __init__(self, scene):
-        super().__init__(scene)
-        self.time = 0
-        rng = random.Random(8)
-        self.rocks = [(WIDTH - s(rng.uniform(10, 70)), HEIGHT - s(rng.uniform(20, 70)), s(rng.uniform(12, 24))) for k in range(4)]
-        self.rocks.sort(key=lambda r: r[1])
-        self.tufts = [(WIDTH - s(rng.uniform(0, 110)), HEIGHT - s(rng.uniform(4, 100)), rng.random()) for k in range(9)]
-        self.shells = [(rng.uniform(s(110), WIDTH - s(110)), rng.uniform(s(SHORE + 60), HEIGHT - s(10)), rng.random()) for k in range(6)]
-        self.image = None
-        self.painted_palette = None
-
-    def paint(self, palette):
-        image = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-        rock = pygame.Color(palette.get("rock", palette["muted"]))
-        dark = pygame.Color(palette.get("rock_dark", palette["muted"]))
-        weed = pygame.Color(palette.get("seaweed", palette["muted"]))
-        shell = pygame.Color(palette.get("shell", palette["text"]))
-        star = pygame.Color(palette.get("starfish", palette["accent"]))
-        for x, y, r in self.rocks:
-            pygame.draw.ellipse(image, (0, 0, 0, 50), (x - r * 1.3, y - r * 0.15, r * 2.6, r * 0.5))
-            points = [(x + math.cos(a) * r * (1.2 if math.cos(a) > 0 else 1.0), y - math.sin(a) * r * 0.8) for a in [math.pi * k / 8 for k in range(9)]]
-            pygame.draw.polygon(image, rock, points)
-            pygame.draw.polygon(image, dark, [points[4], points[5], points[6], points[7], points[8], (x - r * 0.2, y)])
-            pygame.draw.lines(image, dark, False, points, 1)
-            for k in range(3):
-                pygame.draw.line(image, weed, (x - r * 0.6 + k * r * 0.5, y - r * 0.1), (x - r * 0.5 + k * r * 0.5, y + r * 0.15), max(1, s(2)))
-        for x, y, pick in self.shells:
-            if pick < 0.2:
-                points = []
-                for k in range(10):
-                    a = -math.pi / 2 + k * math.pi / 5
-                    rr = s(8) if k % 2 == 0 else s(3)
-                    points.append((x + math.cos(a) * rr, y + math.sin(a) * rr * 0.6))
-                pygame.draw.polygon(image, star, points)
-            else:
-                pygame.draw.ellipse(image, shell, (x - s(3.5), y - s(2.5), s(7), s(5)))
-                for k in (-1, 0, 1):
-                    pygame.draw.line(image, shell.lerp(dark, 0.4), (x, y + s(2)), (x + k * s(2.5), y - s(2)), 1)
-        self.image = image
-        self.painted_palette = palette
-
-    def update(self, dt):
-        self.time += dt
-
-    def draw(self, surface, palette):
-        if self.painted_palette is not palette:
-            self.paint(palette)
-        surface.blit(self.image, (0, 0))
-        grass = pygame.Color(palette.get("beach_grass", palette["muted"]))
-        wind = self.scene.weather.get("wind", 1)
-        for x, y, pick in self.tufts:
-            for b in range(6):
-                lean = (b - 2.5) * 0.25 - 0.4 * wind - math.sin(self.time / 700 + pick * 6 + b * 0.3) * 0.15 * wind
-                h = s(22) * (0.6 + 0.4 * ((b * 0.37 + pick) % 1))
-                mid = (x + b - 3 + lean * h * 0.3, y - h * 0.5)
-                tip = (x + b - 3 + lean * h * 0.8, y - h)
-                pygame.draw.lines(surface, grass if b % 2 else grass.lerp((0, 0, 0), 0.2), False, [(x + b - 3, y), mid, tip], max(1, s(1.5)))
+        # The reflection, strip by strip, each slid a little sideways
+        self.reflect_image.set_alpha(alpha)
+        width = self.reflect_image.get_width()
+        for top, tall, shift in self.strips:
+            area = pygame.Rect(0, int(top), width, max(1, round(tall)))
+            surface.blit(self.reflect_image, (shift, self.horizon + int(top)), area)
