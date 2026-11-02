@@ -256,6 +256,14 @@ THEMES = {
             "moonlight": True,
             "moonlight_sheen": (22, 30, 38),
             "firefly": "#e8f08a",
+            "frog": "#2a3a24",          # life around the brook
+            "frog_dark": "#141d10",
+            "frog_light": "#6d7a5a",
+            "paper": "#8e98a3",
+            "paper_shade": "#59616a",
+            "deer": "#3e3024",
+            "deer_light": "#5f5446",
+            "deer_dark": "#1a140e",
             "haze": "#060a08",          # darkness gathering at the far end
             "haze_strength": 0.35,
             "halo": "#0f1512",
@@ -296,6 +304,20 @@ THEMES = {
             "wood_ring": "#a7845a",
             "sunlight": (60, 54, 28),    # light added where the sun gets through the leaves
             "glint": "#ffffff",
+            "frog": "#6f9a3f",          # life around the brook
+            "frog_dark": "#3a5522",
+            "frog_light": "#e1ecbd",
+            "dragonfly": ["#2c6aa6", "#2f8a76"],
+            "wing": "#eef5f6",
+            "butterfly": ["#f2c94c", "#f6f2e6", "#e3873a", "#9db7e6"],
+            "butterfly_edge": "#2d2a26",
+            "kingfisher": "#1d8fc2",
+            "kingfisher_breast": "#e5823a",
+            "paper": "#f8f5ee",
+            "paper_shade": "#c8c2b2",
+            "deer": "#a2693a",
+            "deer_light": "#ecdcc2",
+            "deer_dark": "#4a3020",
             "haze": "#e8eee6",          # soft light in the air at the far end
             "haze_strength": 0.3,
             "halo": "#e4eedc",

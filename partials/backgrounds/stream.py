@@ -6,6 +6,8 @@ from partials.backgrounds.perspective import Perspective
 from partials.backgrounds.brook import BrookCourse, BrookBed, BrookWater, BrookRocks, BrookLeaves, BrookHaze, FallenLog
 from partials.backgrounds.brook_flow import BrookCurrent, BrookWakes, DriftingLeaves
 from partials.backgrounds.brook_light import SunDapples, WaterGlints, Fireflies
+from partials.backgrounds.brook_life import (BrookRings, Dragonflies, Butterflies, Frog, Visits, VisitClock,
+                                             Kingfisher, PaperBoat, Deer)
 
 
 class StreamBackground(LayeredBackground):
@@ -32,19 +34,29 @@ class StreamBackground(LayeredBackground):
         # Back to front: the bed and banks, the water and its current, the stones and the
         # ripples behind them, leaves (drifting on the water, lying on the banks), and the
         # fallen log on games when that's how the brook is crossed (stepping stones otherwise),
-        # sunlight through the leaves, the far end's haze, and fireflies
+        # the frog, things flying low over the brook, sunlight through the leaves, the far
+        # end's haze, and fireflies. Rare visitors take turns (see Visits)
         self.course = BrookCourse(self.view)
         self.bed = self.add(BrookBed(self, self.course))
         self.water = self.add(BrookWater(self, self.course))
         self.current = self.add(BrookCurrent(self, self.course, self.water))
         self.dapples = SunDapples(self)                                 # drawn later, over everything
         self.glints = self.add(WaterGlints(self, self.course, self.water, self.dapples))
+        self.rings = self.add(BrookRings(self, self.water))             # where things touch the water
         self.rocks = BrookRocks(self, self.course)
         self.wakes = self.add(BrookWakes(self, self.course, self.water, self.rocks))
         self.add(self.rocks)
         self.drifting = self.add(DriftingLeaves(self, self.course, self.water, self.rocks))
+        visits = Visits()
+        self.add(VisitClock(self, visits))
+        self.boat = self.add(visits.join(PaperBoat(self, self.course, self.rocks)))
         self.leaves = self.add(BrookLeaves(self, self.course))
         self.log = self.add(FallenLog(self, self.course))            # only on some games
+        self.frog = self.add(Frog(self, self.course, self.rocks, self.log, self.rings))
+        self.deer = self.add(visits.join(Deer(self, self.course, self.rings, self.rocks)))
+        self.dragonflies = self.add(Dragonflies(self, self.course))   # by day
+        self.butterflies = self.add(Butterflies(self, self.course))   # by day
+        self.kingfisher = self.add(visits.join(Kingfisher(self, self.course, self.rings)))
         self.add(self.dapples)                                          # sunlight by day
         self.haze = self.add(BrookHaze(self))
         self.fireflies = self.add(Fireflies(self, self.course))         # at night
