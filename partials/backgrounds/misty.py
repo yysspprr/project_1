@@ -63,8 +63,8 @@ class MistyBackground(LayeredBackground):
         # front of it: the monastery on the second ridge, the mist pouring over the third ridge
         # now and then, sunbeams slanting down through the mist by day, an eagle circling,
         # and last the ledge with its cairn and prayer flags (with the marmot and the ibex in
-        # front of them), and the
-        # choughs. Rare visitors (climbers, a yak caravan, a paraglider, a snow leopard) take turns
+        # front of them), and the choughs. Rare visitors (climbers, a yak caravan, a paraglider,
+        # a snow leopard) take turns
         self.sky = self.add(PeakSky(self))
         visits = Visits()                                               # rare visitors take turns
         self.add(VisitClock(self, visits))
