@@ -1,6 +1,89 @@
 # Color palettes: each theme has a dark and a light version,
 # and every palette uses the same names
 
+def negative(palette):
+    # A palette's photographic negative: every color inverted (alpha kept), numbers left
+    # as they are. Layers that glow check "negative" and take light away instead of adding it
+    def flip(value):
+        if isinstance(value, str) and value.startswith("#"):
+            r, g, b = int(value[1:3], 16), int(value[3:5], 16), int(value[5:7], 16)
+            return "#{:02x}{:02x}{:02x}".format(255 - r, 255 - g, 255 - b)
+        if isinstance(value, tuple) and value and all(isinstance(v, int) for v in value):
+            return tuple(255 - v for v in value[:3]) + tuple(value[3:])
+        if isinstance(value, tuple):
+            return tuple(flip(v) for v in value)
+        return value
+    flipped = {key: flip(value) for key, value in palette.items()}
+    flipped["negative"] = True
+    return flipped
+
+
+SPACE = {                           # the space theme's night: light mode is its negative
+    "bg": "#06070f",
+    "text": "#e8eaf6",
+    "accent": "#ffc65a",
+    "field": "#14162a",
+    "muted": "#8e92b2",
+    "overlay": (0, 0, 0, 160),
+    "history_box": (0, 0, 0, 60),
+    "range_fill": "#ffc65a",
+    "bar": (0, 0, 0, 50),
+    "space_top": "#04050c",         # deep space, the nebula and a far galaxy
+    "space_low": "#0b0a1c",
+    "nebula": ("#6a2c9a", "#2058a8", "#b03a74"),
+    "nebula_strength": 0.8,
+    "galaxy": "#c8b8ff",
+    "galaxy_core": "#fff0d4",
+    "star_colors": ("#ffffff", "#c8dcff", "#fff0c4", "#ffcaa8"),
+    "sun": "#fffbea",               # the Sun, far behind us
+    "sun_glow": "#6a5c3a",
+    "planet": "#e2c494",            # the ringed planet and its moon
+    "planet_bands": ("#c89a66", "#b0784e", "#ead4a8", "#9a6a4a"),
+    "planet_night": "#0a0812",
+    "ring": "#d8c8a6",
+    "ring_dark": "#8a7a64",
+    "moon": "#b8b4c2",
+    "moon_dark": "#5a5868",
+    "dish": "#eceef4",              # Voyager
+    "dish_shade": "#8e92a2",
+    "probe": "#a8a8b4",
+    "foil": "#d8a43c",
+    "boom": "#7a7c8a",
+    "record": "#f2c650",
+    "pulsar": "#bcdcff",            # things that glow
+    "earth": "#8ab8ff",
+    "sunbeam": "#141420",
+    "signal": "#5ae0f0",
+    "comet": "#e8f4ff",
+    "comet_dust": "#c8b088",
+    "comet_ion": "#5a8aff",
+    "supernova": "#fff0dc",
+    "rock": "#4e4a56",              # visitors
+    "rock_light": "#8e8696",
+    "rock_dark": "#2a2630",
+    "rocket": "#e8e8ee",
+    "rocket_trim": "#d0403a",
+    "porthole": "#5ab0e0",
+    "flame": "#ff9a3a",
+    "flame_core": "#fff0b0",
+    "saucer": "#a0a8b8",
+    "saucer_dark": "#5a6274",
+    "dome": "#7ae0c8",
+    "saucer_lights": ("#ff5a5a", "#ffe05a", "#5aff8a", "#5ac8ff"),
+    "saucer_beam": "#2a6048",
+    "suit": "#eceef4",
+    "suit_shade": "#a0a2b0",
+    "visor": "#d89a34",
+    "visor_glint": "#ffffff",
+    "jet": "#7a8494",
+    "sail": "#9ea4b8",
+    "sail_light": "#dfe4f2",
+    "sail_glint": "#fff6dc",
+    "halo": "#06070f",
+    "shadow": 0.15,
+}
+
+
 THEMES = {
     "plain": {
         "dark": {
@@ -1199,6 +1282,17 @@ THEMES = {
             "water": "#8ac0f0",
             "halo": "#f6f2ec",
             "shadow": 0.3,
+        },
+    },
+    "space": {
+        "dark": SPACE,
+        "light": {
+            **negative(SPACE),
+            # The see-through boxes stay dark, like every other light palette: their negatives
+            # (white on white) would vanish
+            "overlay": (0, 0, 0, 100),
+            "history_box": (0, 0, 0, 30),
+            "bar": (0, 0, 0, 30),
         },
     },
 }
